@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0a0a0c; color: #e2e8f0; margin: 0; height: 100vh; overflow: hidden; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0a0a0c; color: #e2e8f0; margin: 0; height: 100vh; overflow: hidden; user-select: none; }
         .magic-circle { animation: spin 40s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .animate-shake { animation: shake 0.4s ease-in-out; }
@@ -16,10 +16,7 @@
         @keyframes burst { 0% { opacity: 0.5; transform: scale(0.8); } 100% { opacity: 0; transform: scale(1.5); } }
         .animate-float-up { animation: floatUp 1s ease-out forwards; }
         @keyframes floatUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(-40px); } }
-        .log-entry { animation: fadeIn 0.3s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .game-viewport { height: 100dvh; display: flex; flex-direction: column; }
     </style>
 </head>
@@ -27,61 +24,54 @@
     <div class="game-viewport">
         <!-- 로딩 화면 -->
         <div id="screen-loading" class="fixed inset-0 z-[100] bg-[#0a0a0c] flex flex-col items-center justify-center">
-            <div class="w-16 h-16 border-4 border-red-900 border-t-red-500 rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(239,68,68,0.5)]"></div>
-            <h1 class="text-2xl font-bold tracking-widest text-gray-400">마법부여소 접속 중...</h1>
+            <div class="w-16 h-16 border-4 border-red-900 border-t-red-500 rounded-full animate-spin mb-6"></div>
+            <h1 class="text-2xl font-bold text-gray-400">마법부여소 접속 중...</h1>
         </div>
 
         <!-- 메뉴 화면 -->
         <div id="screen-menu" class="hidden fixed inset-0 z-50 bg-[#0a0a0c] flex flex-col items-center justify-center p-6 text-center">
-            <div class="z-10">
-                <h1 class="text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-b from-gray-100 to-gray-500 drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] tracking-tight">무기 강화</h1>
-                <p class="text-red-500 font-bold mb-16 text-lg tracking-widest drop-shadow-md">THE LEGENDARY BLACKSMITH</p>
-                <button onclick="changeScreen('playing')" class="py-5 px-12 bg-gradient-to-r from-red-900 to-red-800 hover:from-red-800 hover:to-red-700 border border-red-950 rounded-sm font-bold text-2xl transition transform hover:scale-105 shadow-[0_0_20px_rgba(153,27,27,0.4)] active:scale-95">시작하기</button>
-            </div>
+            <h1 class="text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-500 tracking-tight">무기 강화</h1>
+            <p class="text-red-500 font-bold mb-16 text-lg tracking-widest">THE LEGENDARY BLACKSMITH</p>
+            <button onclick="changeScreen('playing')" class="py-5 px-12 bg-red-800 hover:bg-red-700 text-white font-bold text-2xl transition transform hover:scale-105 active:scale-95">시작하기</button>
         </div>
 
         <!-- 게임 화면 -->
         <div id="screen-playing" class="hidden flex-1 flex flex-col relative overflow-hidden bg-gradient-to-b from-[#1a1a24] to-[#0a0a0c]">
-            <header class="flex justify-between items-center px-6 py-4 bg-[#12121a] border-b border-gray-800 shrink-0 z-30">
-                <div class="flex items-center gap-3">
-                    <span class="text-yellow-500 font-bold text-xl">⛃</span>
-                    <span id="gold-display" class="font-mono text-xl font-bold text-gray-100">10,000 G</span>
-                </div>
-                <button onclick="changeScreen('menu')" class="text-xs text-gray-500 border border-gray-800 px-3 py-1 bg-black/40">메뉴로</button>
+            <header class="flex justify-between items-center px-6 py-4 bg-[#12121a] border-b border-gray-800 shrink-0">
+                <div class="flex items-center gap-3"><span class="text-yellow-500 font-bold text-xl">⛃</span><span id="gold-display" class="font-mono text-xl font-bold">10,000 G</span></div>
+                <button onclick="changeScreen('menu')" class="text-xs text-gray-500 border border-gray-800 px-3 py-1">메뉴</button>
             </header>
 
-            <div id="game-main" class="flex-1 relative flex flex-col items-center justify-center z-10">
-                <div id="effect-overlay" class="absolute inset-0 z-40 pointer-events-none flex items-center justify-center"></div>
+            <div class="flex-1 relative flex flex-col items-center justify-center">
+                <div id="effect-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-center"></div>
                 <div class="text-center mb-4 z-20">
                     <h2 class="text-3xl md:text-5xl font-black text-gray-100"><span id="level-display" class="text-red-500">+0</span> <span id="name-display">기본검</span></h2>
                 </div>
-                <div id="sword-image-container" class="relative w-full max-w-sm aspect-square flex items-center justify-center transition-transform duration-500">
+                <div id="sword-image-container" class="relative w-full max-w-sm aspect-square flex items-center justify-center transition-transform duration-500 p-4">
                     <img id="sword-image" src="" alt="무기" class="max-w-full max-h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.2)]">
                 </div>
             </div>
 
-            <div class="shrink-0 z-30">
-                <div class="bg-[#12121a]/95 border-t border-gray-800 flex flex-col md:flex-row">
-                    <div class="flex-1 p-4 border-b md:border-b-0 md:border-r border-gray-800/50 flex gap-2">
-                        <div class="flex-1 bg-[#0a0a0c] p-2 rounded-sm border border-gray-800/50 text-center"><span class="text-[10px] text-gray-500 block">성공 확률</span><span id="prob-display" class="text-green-400 font-bold text-lg">100%</span></div>
-                        <div class="flex-1 bg-[#0a0a0c] p-2 rounded-sm border border-gray-800/50 text-center"><span class="text-[10px] text-gray-500 block">강화 비용</span><span id="cost-display" class="text-yellow-500 font-bold text-lg">100 G</span></div>
-                    </div>
-                    <div class="flex-1 p-4 flex gap-3 bg-[#0d0d14]">
-                        <button id="enhance-btn" class="flex-[2] py-4 bg-gradient-to-r from-red-900 to-red-800 text-white font-black text-xl tracking-widest active:scale-95 disabled:opacity-50">마법부여</button>
-                        <button id="sell-btn" class="flex-1 py-4 bg-[#1a1a24] text-gray-300 font-bold text-sm active:scale-95">판매 <span id="sell-price-display" class="block text-yellow-500 text-[10px]">50 G</span></button>
-                    </div>
+            <div class="shrink-0 bg-[#12121a]/95 border-t border-gray-800 p-4 flex flex-col gap-4">
+                <div class="flex gap-2">
+                    <div class="flex-1 bg-[#0a0a0c] p-2 rounded border border-gray-800 text-center"><span class="text-[10px] text-gray-500 block">확률</span><span id="prob-display" class="text-green-400 font-bold text-lg">100%</span></div>
+                    <div class="flex-1 bg-[#0a0a0c] p-2 rounded border border-gray-800 text-center"><span class="text-[10px] text-gray-500 block">비용</span><span id="cost-display" class="text-yellow-500 font-bold text-lg">100 G</span></div>
                 </div>
-                <div id="log-container" class="h-24 bg-[#050508] p-4 overflow-y-auto space-y-1 font-mono text-[11px] no-scrollbar"></div>
+                <div class="flex gap-3">
+                    <button id="enhance-btn" class="flex-[2] py-4 bg-red-900 text-white font-black text-xl active:scale-95 disabled:opacity-50">마법부여</button>
+                    <button id="sell-btn" class="flex-1 py-4 bg-[#1a1a24] text-gray-300 font-bold text-sm active:scale-95">판매 <span id="sell-price-display" class="block text-yellow-500 text-[10px]">50 G</span></button>
+                </div>
+                <div id="log-container" class="h-24 bg-[#050508] p-4 overflow-y-auto space-y-1 font-mono text-[11px] no-scrollbar border border-gray-900"></div>
             </div>
         </div>
 
-        <!-- 요정 모달 -->
+        <!-- 지원금 모달 -->
         <div id="modal-fairy" class="hidden fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4">
-            <div class="bg-[#12121a] border border-yellow-900/50 p-8 text-center max-w-sm animate-float-up">
+            <div class="bg-[#12121a] border border-yellow-900/50 p-8 text-center max-w-sm">
                 <div class="text-6xl mb-4">🧚‍♀️</div>
-                <h3 class="text-xl font-bold mb-6 text-gray-100">지원금이 도착했습니다!</h3>
-                <div class="bg-[#0a0a0c] p-4 rounded-sm mb-6 text-yellow-500 font-bold text-2xl">+ 5,000 G</div>
-                <button id="fairy-btn" class="w-full py-4 bg-yellow-600/20 border border-yellow-600/50 text-yellow-500 font-bold active:scale-95">받기</button>
+                <h3 class="text-xl font-bold mb-6 text-gray-100">지원이 필요하신가요?</h3>
+                <div class="bg-[#0a0a0c] p-4 rounded mb-6 text-yellow-500 font-bold text-2xl">+ 5,000 G</div>
+                <button onclick="receiveFairy()" class="w-full py-4 bg-yellow-600/20 border border-yellow-600/50 text-yellow-500 font-bold active:scale-95">받기</button>
             </div>
         </div>
     </div>
@@ -93,79 +83,73 @@
 
         let state = { gold: 10000, level: 0, isEnhancing: false };
 
-        const elements = {
-            screens: { loading: document.getElementById('screen-loading'), menu: document.getElementById('screen-menu'), playing: document.getElementById('screen-playing') },
-            displays: { gold: document.getElementById('gold-display'), level: document.getElementById('level-display'), name: document.getElementById('name-display'), prob: document.getElementById('prob-display'), cost: document.getElementById('cost-display'), sellPrice: document.getElementById('sell-price-display'), swordImg: document.getElementById('sword-image') },
-            containers: { swordImg: document.getElementById('sword-image-container'), logs: document.getElementById('log-container'), effects: document.getElementById('effect-overlay'), game: document.getElementById('game-main') },
-            btns: { enhance: document.getElementById('enhance-btn'), sell: document.getElementById('sell-btn'), fairy: document.getElementById('fairy-btn') },
-            modals: { fairy: document.getElementById('modal-fairy') }
-        };
-
         function changeScreen(name) {
-            Object.values(elements.screens).forEach(s => s.classList.add('hidden'));
-            elements.screens[name].classList.remove('hidden');
+            document.querySelectorAll('[id^="screen-"]').forEach(s => s.classList.add('hidden'));
+            document.getElementById(`screen-${name}`).classList.remove('hidden');
             if(name === 'playing') updateUI();
         }
 
         function updateUI() {
             const d = LEVEL_DATA[state.level];
-            elements.displays.gold.textContent = `${state.gold.toLocaleString()} G`;
-            elements.displays.level.textContent = `+${state.level}`;
-            elements.displays.name.textContent = state.level === 0 ? "기본검" : "화염검";
-            elements.displays.prob.textContent = state.level < 20 ? `${d.prob}%` : "MAX";
-            elements.displays.cost.textContent = state.level < 20 ? `${d.cost.toLocaleString()} G` : "-";
-            elements.displays.sellPrice.textContent = `${d.sell.toLocaleString()} G`;
+            document.getElementById('gold-display').innerText = `${state.gold.toLocaleString()} G`;
+            document.getElementById('level-display').innerText = `+${state.level}`;
+            document.getElementById('name-display').innerText = state.level === 0 ? "기본검" : "화염검";
+            document.getElementById('prob-display').innerText = state.level < 20 ? `${d.prob}%` : "MAX";
+            document.getElementById('cost-display').innerText = state.level < 20 ? `${d.cost.toLocaleString()} G` : "-";
+            document.getElementById('sell-price-display').innerText = `${d.sell.toLocaleString()} G`;
             
-            // 이미지 경로: image 폴더 안의 png 파일을 사용
-            elements.displays.swordImg.src = state.level === 0 ? `image/기본검.png` : `image/화염검 _ ${Math.min(state.level, 10)}.png`;
-            elements.displays.swordImg.onerror = () => { elements.displays.swordImg.src = 'https://via.placeholder.com/400?text=Sword+Image'; };
-            elements.containers.swordImg.style.transform = `scale(${1 + state.level * 0.02})`;
+            const swordImg = document.getElementById('sword-image');
+            swordImg.src = state.level === 0 ? `image/기본검.png` : `image/화염검 _ ${Math.min(state.level, 10)}.png`;
+            swordImg.onerror = () => { swordImg.src = 'https://via.placeholder.com/400?text=Sword+Image+Lost'; };
+            document.getElementById('sword-image-container').style.transform = `scale(${1 + state.level * 0.02})`;
         }
 
-        function addLog(text, type) {
+        function addLog(text, color) {
             const e = document.createElement('div');
-            e.className = `log-entry ${type === 'success' ? 'text-green-400' : type === 'error' ? 'text-red-500' : 'text-gray-500'}`;
-            e.innerHTML = `▶ ${text}`;
-            elements.containers.logs.prepend(e);
+            e.className = color;
+            e.innerText = `▶ ${text}`;
+            const container = document.getElementById('log-container');
+            container.prepend(e);
         }
 
-        elements.btns.enhance.onclick = () => {
+        document.getElementById('enhance-btn').onclick = () => {
             if (state.isEnhancing) return;
             const d = LEVEL_DATA[state.level];
-            if (state.gold < d.cost) return addLog('골드가 부족합니다.', 'error');
+            if (state.gold < d.cost) return addLog('골드가 부족합니다.', 'text-red-500');
 
             state.isEnhancing = true;
             state.gold -= d.cost;
-            addLog(`강화 시도 중... (-${d.cost}G)`, 'info');
-            elements.containers.swordImg.classList.add('opacity-50', 'blur-sm');
+            addLog(`강화 시도 중... (-${d.cost}G)`, 'text-gray-500');
+            document.getElementById('sword-image-container').classList.add('opacity-50', 'blur-sm');
 
             setTimeout(() => {
                 const success = Math.random() * 100 < d.prob;
-                elements.containers.swordImg.classList.remove('opacity-50', 'blur-sm');
+                document.getElementById('sword-image-container').classList.remove('opacity-50', 'blur-sm');
                 if (success) {
                     state.level++;
-                    addLog('강화 성공!', 'success');
+                    addLog('강화 성공!', 'text-green-400');
                 } else {
                     state.level = 0;
-                    addLog('강화 실패! 무기가 파괴되었습니다.', 'error');
+                    addLog('실패! 무기가 파괴되었습니다.', 'text-red-500');
                 }
                 state.isEnhancing = false;
                 updateUI();
-                if (state.gold < 100 && state.level === 0) elements.modals.fairy.classList.remove('hidden');
+                if (state.gold < 100 && state.level === 0) document.getElementById('modal-fairy').classList.remove('hidden');
             }, 800);
         };
 
-        elements.btns.sell.onclick = () => {
+        document.getElementById('sell-btn').onclick = () => {
             state.gold += LEVEL_DATA[state.level].sell;
             state.level = 0;
             updateUI();
+            addLog('판매 완료!', 'text-yellow-500');
         };
 
-        elements.btns.fairy.onclick = () => {
+        function receiveFairy() {
             state.gold += 5000;
-            elements.modals.fairy.classList.add('hidden');
+            document.getElementById('modal-fairy').classList.add('hidden');
             updateUI();
-        };
+        }
 
         window.onload = () => setTimeout(() => changeScreen('menu'), 1500);
     </script>
