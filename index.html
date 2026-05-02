@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>전설의 무기 강화 - 마법부여소</title>
+    <title>전설의 무기 강화</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
@@ -22,28 +22,28 @@
 </head>
 <body class="bg-black">
     <div class="game-viewport">
-        <!-- 로딩 화면 -->
+        <!-- 1. 로딩 화면 -->
         <div id="screen-loading" class="fixed inset-0 z-[100] bg-[#0a0a0c] flex flex-col items-center justify-center">
             <div class="w-16 h-16 border-4 border-red-900 border-t-red-500 rounded-full animate-spin mb-6"></div>
             <h1 class="text-2xl font-bold text-gray-400">마법부여소 접속 중...</h1>
         </div>
 
-        <!-- 메뉴 화면 -->
+        <!-- 2. 메뉴 화면 -->
         <div id="screen-menu" class="hidden fixed inset-0 z-50 bg-[#0a0a0c] flex flex-col items-center justify-center p-6 text-center">
             <h1 class="text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-500 tracking-tight">무기 강화</h1>
-            <p class="text-red-500 font-bold mb-16 text-lg tracking-widest">THE LEGENDARY BLACKSMITH</p>
-            <button onclick="changeScreen('playing')" class="py-5 px-12 bg-red-800 hover:bg-red-700 text-white font-bold text-2xl transition transform hover:scale-105 active:scale-95">시작하기</button>
+            <p class="text-red-500 font-bold mb-16 text-lg tracking-widest uppercase">The Legendary Blacksmith</p>
+            <button onclick="changeScreen('playing')" class="py-5 px-12 bg-red-800 hover:bg-red-700 text-white font-bold text-2xl transition transform hover:scale-105 active:scale-95 shadow-xl">시작하기</button>
         </div>
 
-        <!-- 게임 화면 -->
+        <!-- 3. 게임 화면 -->
         <div id="screen-playing" class="hidden flex-1 flex flex-col relative overflow-hidden bg-gradient-to-b from-[#1a1a24] to-[#0a0a0c]">
             <header class="flex justify-between items-center px-6 py-4 bg-[#12121a] border-b border-gray-800 shrink-0">
                 <div class="flex items-center gap-3"><span class="text-yellow-500 font-bold text-xl">⛃</span><span id="gold-display" class="font-mono text-xl font-bold">10,000 G</span></div>
-                <button onclick="changeScreen('menu')" class="text-xs text-gray-500 border border-gray-800 px-3 py-1">메뉴</button>
+                <button onclick="changeScreen('menu')" class="text-xs text-gray-500 border border-gray-800 px-3 py-1">나가기</button>
             </header>
 
             <div class="flex-1 relative flex flex-col items-center justify-center">
-                <div id="effect-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-center"></div>
+                <div id="effect-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-center z-40"></div>
                 <div class="text-center mb-4 z-20">
                     <h2 class="text-3xl md:text-5xl font-black text-gray-100"><span id="level-display" class="text-red-500">+0</span> <span id="name-display">기본검</span></h2>
                 </div>
@@ -52,7 +52,7 @@
                 </div>
             </div>
 
-            <div class="shrink-0 bg-[#12121a]/95 border-t border-gray-800 p-4 flex flex-col gap-4">
+            <div class="shrink-0 bg-[#12121a] border-t border-gray-800 p-4 flex flex-col gap-4">
                 <div class="flex gap-2">
                     <div class="flex-1 bg-[#0a0a0c] p-2 rounded border border-gray-800 text-center"><span class="text-[10px] text-gray-500 block">확률</span><span id="prob-display" class="text-green-400 font-bold text-lg">100%</span></div>
                     <div class="flex-1 bg-[#0a0a0c] p-2 rounded border border-gray-800 text-center"><span class="text-[10px] text-gray-500 block">비용</span><span id="cost-display" class="text-yellow-500 font-bold text-lg">100 G</span></div>
@@ -69,17 +69,37 @@
         <div id="modal-fairy" class="hidden fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4">
             <div class="bg-[#12121a] border border-yellow-900/50 p-8 text-center max-w-sm">
                 <div class="text-6xl mb-4">🧚‍♀️</div>
-                <h3 class="text-xl font-bold mb-6 text-gray-100">지원이 필요하신가요?</h3>
+                <h3 class="text-xl font-bold mb-6 text-gray-100">지원금이 도착했습니다!</h3>
                 <div class="bg-[#0a0a0c] p-4 rounded mb-6 text-yellow-500 font-bold text-2xl">+ 5,000 G</div>
-                <button onclick="receiveFairy()" class="w-full py-4 bg-yellow-600/20 border border-yellow-600/50 text-yellow-500 font-bold active:scale-95">받기</button>
+                <button id="fairy-btn" class="w-full py-4 bg-yellow-600/20 border border-yellow-600/50 text-yellow-500 font-bold active:scale-95">받기</button>
             </div>
         </div>
     </div>
 
     <script>
-        const LEVEL_DATA = Array.from({length: 21}, (_, i) => ({
-            level: i, cost: i * 500 + 100, prob: Math.max(100 - i * 5, 5), sell: Math.pow(i, 3) * 1000 + 50
-        }));
+        const LEVEL_DATA = [
+            { level: 0, cost: 100, prob: 100, sell: 50 },
+            { level: 1, cost: 500, prob: 98, sell: 300 },
+            { level: 2, cost: 1000, prob: 90, sell: 1200 },
+            { level: 3, cost: 1500, prob: 85, sell: 2500 },
+            { level: 4, cost: 2000, prob: 80, sell: 5500 },
+            { level: 5, cost: 3000, prob: 75, sell: 15000 },
+            { level: 6, cost: 4000, prob: 70, sell: 28000 },
+            { level: 7, cost: 5500, prob: 65, sell: 45000 },
+            { level: 8, cost: 7000, prob: 60, sell: 75000 },
+            { level: 9, cost: 9000, prob: 55, sell: 120000 },
+            { level: 10, cost: 12000, prob: 50, sell: 200000 },
+            { level: 11, cost: 15000, prob: 45, sell: 350000 },
+            { level: 12, cost: 20000, prob: 40, sell: 600000 },
+            { level: 13, cost: 26000, prob: 35, sell: 1000000 },
+            { level: 14, cost: 35000, prob: 30, sell: 1800000 },
+            { level: 15, cost: 45000, prob: 25, sell: 3000000 },
+            { level: 16, cost: 60000, prob: 20, sell: 5500000 },
+            { level: 17, cost: 80000, prob: 15, sell: 10000000 },
+            { level: 18, cost: 110000, prob: 10, sell: 18000000 },
+            { level: 19, cost: 150000, prob: 5, sell: 35000000 },
+            { level: 20, cost: 0, prob: 0, sell: 80000000 }
+        ];
 
         let state = { gold: 10000, level: 0, isEnhancing: false };
 
@@ -99,8 +119,11 @@
             document.getElementById('sell-price-display').innerText = `${d.sell.toLocaleString()} G`;
             
             const swordImg = document.getElementById('sword-image');
+            // 이미지 경로 수정: image/파일명.png
             swordImg.src = state.level === 0 ? `image/기본검.png` : `image/화염검 _ ${Math.min(state.level, 10)}.png`;
-            swordImg.onerror = () => { swordImg.src = 'https://via.placeholder.com/400?text=Sword+Image+Lost'; };
+            
+            // 이미지 로딩 실패 시 아바타 이미지로 대체 (경로 확인용)
+            swordImg.onerror = () => { swordImg.src = 'https://via.placeholder.com/400?text=Check+Image+Folder'; };
             document.getElementById('sword-image-container').style.transform = `scale(${1 + state.level * 0.02})`;
         }
 
@@ -108,8 +131,7 @@
             const e = document.createElement('div');
             e.className = color;
             e.innerText = `▶ ${text}`;
-            const container = document.getElementById('log-container');
-            container.prepend(e);
+            document.getElementById('log-container').prepend(e);
         }
 
         document.getElementById('enhance-btn').onclick = () => {
@@ -119,7 +141,7 @@
 
             state.isEnhancing = true;
             state.gold -= d.cost;
-            addLog(`강화 시도 중... (-${d.cost}G)`, 'text-gray-500');
+            addLog(`강화 의식 중... (-${d.cost}G)`, 'text-gray-500');
             document.getElementById('sword-image-container').classList.add('opacity-50', 'blur-sm');
 
             setTimeout(() => {
@@ -130,7 +152,7 @@
                     addLog('강화 성공!', 'text-green-400');
                 } else {
                     state.level = 0;
-                    addLog('실패! 무기가 파괴되었습니다.', 'text-red-500');
+                    addLog('실패... 무기가 파괴되었습니다.', 'text-red-500');
                 }
                 state.isEnhancing = false;
                 updateUI();
@@ -142,15 +164,16 @@
             state.gold += LEVEL_DATA[state.level].sell;
             state.level = 0;
             updateUI();
-            addLog('판매 완료!', 'text-yellow-500');
+            addLog('판매가 완료되었습니다.', 'text-yellow-500');
         };
 
-        function receiveFairy() {
+        document.getElementById('fairy-btn').onclick = () => {
             state.gold += 5000;
             document.getElementById('modal-fairy').classList.add('hidden');
             updateUI();
-        }
+        };
 
+        // 초기 시작
         window.onload = () => setTimeout(() => changeScreen('menu'), 1500);
     </script>
 </body>
