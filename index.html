@@ -7,7 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script>
-        // 전역 상태를 가장 먼저 초기화하여 모든 스크립트에서 참조 가능하게 함
+        /**
+         * 전역 상태 초기화
+         * 모든 스크립트 블록에서 즉시 접근 가능한 최신 객체 구조 적용
+         */
         window.gameState = {
             money: 10000,
             lv: 0,
@@ -21,15 +24,20 @@
         window.gameDB = { initialized: false, offline: false, userId: null };
     </script>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK (최신 ES 모듈 방식) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        async function initFirebase() {
+        /**
+         * Firebase 시스템 초기화 및 데이터 동기화 최적화
+         */
+        const initFirebaseSystem = async () => {
             try {
-                if (typeof __firebase_config === 'undefined') throw new Error("Config missing");
+                if (typeof __firebase_config === 'undefined') {
+                    throw new Error("환경 변수 누락");
+                }
                 
                 const firebaseConfig = JSON.parse(__firebase_config);
                 const app = initializeApp(firebaseConfig);
@@ -37,85 +45,90 @@
                 const db = getFirestore(app);
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-                // RULE 3: Auth Before Queries
-                let userCredential;
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    userCredential = await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    userCredential = await signInAnonymously(auth);
-                }
+                // 브라우저 세션 영속성 강화 (새로고침 시 로그인 유지)
+                await setPersistence(auth, browserLocalPersistence);
 
-                const userId = userCredential.user.uid;
+                // 최신 인증 감시 로직
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        window.gameDB = { 
+                            db, auth, appId, userId: user.uid, doc, getDoc, setDoc, 
+                            initialized: false, 
+                            offline: false 
+                        };
+                        
+                        // 클라우드 데이터 동기화 대기
+                        await window.syncDataFromCloud();
+                        window.gameDB.initialized = true;
+                        console.log("Modern Cloud Persistence Active");
+                    } else {
+                        // 익명 세션 생성
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
                 
-                // 데이터 접근에 필요한 객체 준비 및 전역 바인딩
-                window.gameDB = { 
-                    db, auth, appId, userId, doc, getDoc, setDoc, 
-                    initialized: false, 
-                    offline: false 
-                };
-
-                // 클라우드 데이터 로드 실행
-                await window.loadDataFromCloud();
-                
-                // 모든 준비 완료
-                window.gameDB.initialized = true;
-                console.log("Firebase storage linked");
-                
-            } catch (e) {
-                console.warn("Firebase Fallback Mode :", e.message);
+            } catch (error) {
+                console.warn("Offline Fallback Mode :", error.message);
                 window.gameDB.initialized = true; 
                 window.gameDB.offline = true;
             }
-        }
-        
-        // 전역 로드 함수 정의
-        window.loadDataFromCloud = async function() {
+        };
+
+        /**
+         * 클라우드 데이터 로드 (최신 비동기 패턴)
+         */
+        window.syncDataFromCloud = async () => {
             if (!window.gameDB || window.gameDB.offline || !window.gameDB.userId) return;
             const { db, appId, userId, doc, getDoc } = window.gameDB;
+            
             try {
-                // RULE 1: Strict Paths 적용
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'data', 'savefile');
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'gameData', 'savefile');
                 const snap = await getDoc(docRef);
+                
                 if (snap.exists()) {
-                    const d = snap.data();
-                    window.gameState.money = d.money ?? 10000; 
-                    window.gameState.lv = d.lv ?? 0; 
-                    window.gameState.spent = d.spent ?? 0; 
-                    window.gameState.attr = d.attr ?? '일반'; 
-                    window.gameState.collection = d.collection ?? [];
-                    console.log("Cloud data synced");
+                    const cloudData = snap.data();
+                    window.gameState.money = cloudData.money ?? 10000;
+                    window.gameState.lv = cloudData.lv ?? 0;
+                    window.gameState.spent = cloudData.spent ?? 0;
+                    window.gameState.attr = cloudData.attr ?? '일반';
+                    window.gameState.collection = cloudData.collection ?? [];
                 }
-            } catch (e) {
-                console.error("Cloud Load Error :", e);
+            } catch (error) {
+                console.error("Cloud Sync Load Failed :", error);
             }
         };
 
-        // 전역 저장 함수 정의
-        window.saveDataToCloud = async function() {
-            if (!window.gameDB || !window.gameDB.initialized || window.gameDB.offline || !window.gameDB.userId) return;
+        /**
+         * 실시간 클라우드 저장
+         */
+        window.saveDataToCloud = async () => {
+            if (!window.gameDB?.initialized || window.gameDB.offline || !window.gameDB.userId) return;
             const { db, appId, userId, doc, setDoc } = window.gameDB;
             
-            const saveIndicator = document.getElementById('save-indicator');
-            if (saveIndicator) saveIndicator.style.display = 'block';
+            const indicator = document.getElementById('save-indicator');
+            if (indicator) indicator.style.display = 'block';
 
             try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'data', 'savefile');
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'gameData', 'savefile');
                 await setDoc(docRef, {
                     money: window.gameState.money,
                     lv: window.gameState.lv,
                     spent: window.gameState.spent,
                     attr: window.gameState.attr,
                     collection: window.gameState.collection,
-                    updatedAt: Date.now()
+                    lastUpdate: Date.now()
                 });
-                if (saveIndicator) setTimeout(() => saveIndicator.style.display = 'none', 1000);
-            } catch (e) {
-                console.error("Cloud Save Error :", e);
-                if (saveIndicator) saveIndicator.textContent = "SAVE FAILED";
+                if (indicator) setTimeout(() => indicator.style.display = 'none', 800);
+            } catch (error) {
+                console.error("Cloud Sync Save Failed :", error);
             }
         };
 
-        initFirebase();
+        initFirebaseSystem();
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&family=Nanum+Myeongjo:wght@700;800&display=swap');
@@ -141,6 +154,7 @@
             height: 100vh;
             -webkit-user-select: none;
             user-select: none;
+            touch-action: manipulation;
         }
 
         #game-container {
@@ -323,8 +337,8 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 12px;
-            row-gap: 55px; /* 수직 간격 충분히 확보 */
-            padding: 10px 0;
+            row-gap: 65px; /* 레이아웃 겹침 방지 여백 확보 */
+            padding: 15px 0 40px 0;
             overflow-y: auto;
             align-content: start;
         }
@@ -340,32 +354,30 @@
             align-items: center;
             position: relative;
             box-shadow: inset 0 0 10px #000;
-            overflow: hidden;
         }
         .slot.collected { border-color: var(--dark-gold); background: #151210; }
         
         .slot img { 
             max-width: 75%; 
             max-height: 75%; 
-            width: auto;
-            height: auto;
             object-fit: contain; 
             z-index: 5; 
         }
         
         .slot.locked img { display: none; }
         .slot.locked::after { content: '?'; font-size: 2.2rem; font-weight: 900; color: #151515; position: absolute; }
+        
         .slot-name { 
             position: absolute; 
-            bottom: 0; 
+            bottom: -35px; 
             width: 100%; 
-            font-size: 7px; 
+            font-size: 8px; 
             text-align: center; 
-            background: rgba(0,0,0,0.85); 
-            padding: 7px 0; 
+            padding: 4px 0; 
             color: #444; 
             font-weight: 900; 
             z-index: 10;
+            line-height: 1.2;
         }
         .slot.collected .slot-name { color: var(--gold); }
 
@@ -402,7 +414,7 @@
 <body>
 
 <div id="game-container">
-    <div id="save-indicator" class="absolute top-3 left-1/2 -translate-x-1/2 text-[8px] text-zinc-800 italic hidden z-50 uppercase font-black">Syncing...</div>
+    <div id="save-indicator" class="absolute top-3 left-1/2 -translate-x-1/2 text-[8px] text-zinc-800 italic hidden z-50 uppercase font-black tracking-widest">Cloud Syncing...</div>
 
     <!-- 로딩 화면 -->
     <div id="loading-screen" class="screen active">
@@ -410,7 +422,7 @@
         <div class="w-44 h-0.5 bg-zinc-900 mt-8 rounded-full overflow-hidden border border-zinc-900">
             <div id="loading-bar" class="h-full bg-yellow-800 w-0 transition-all duration-300"></div>
         </div>
-        <p class="mt-4 text-[9px] text-zinc-700 font-bold uppercase tracking-[0.4em]">클라우드 연결 중...</p>
+        <p class="mt-4 text-[9px] text-zinc-700 font-bold uppercase tracking-[0.4em]">클라우드 데이터를 동기화 중...</p>
     </div>
 
     <!-- 메인 메뉴 -->
@@ -423,7 +435,7 @@
         <button onclick="toggleOverlay('collection-overlay', true)" class="menu-btn">수집한 유산 (도감)</button>
         <button onclick="toggleOverlay('how-to-play', true)" class="menu-btn">제련의 비기 (가이드)</button>
         <button onclick="toggleOverlay('options', true)" class="menu-btn">장인 설정 (옵션)</button>
-        <p class="mt-12 text-[9px] text-zinc-800 font-black uppercase tracking-widest">Version 2.9.0 | Persistence Fixed</p>
+        <p class="mt-12 text-[9px] text-zinc-800 font-black uppercase tracking-widest">Version 3.6.0 | ES2024 Final Engine</p>
     </div>
 
     <!-- 인게임 화면 -->
@@ -490,7 +502,34 @@
         </div>
 
         <div id="col-list" class="flex-1 overflow-y-auto no-scrollbar collection-grid"></div>
-        <button onclick="toggleOverlay('collection-overlay', false)" class="mt-6 py-4 bg-zinc-950 text-zinc-700 font-bold rounded text-[10px] uppercase tracking-widest">Back</button>
+        <button onclick="toggleOverlay('collection-overlay', false)" class="mt-8 py-4 bg-zinc-950 text-zinc-700 font-bold rounded text-[10px] uppercase tracking-widest">Back</button>
+    </div>
+
+    <!-- 가이드 -->
+    <div id="how-to-play" class="overlay">
+        <h2 class="text-2xl font-black text-white mb-10 border-b border-zinc-900 w-full text-center pb-4 font-serif">제련의 비결 (가이드)</h2>
+        <div class="guide-text flex-1 overflow-y-auto px-4 no-scrollbar">
+            <p class="mb-5 text-[15px] leading-relaxed text-[#999]"><b class="text-[#d4af37] text-[17px]">1. 강화의 기초</b><br>보유한 금전을 소모하여 검을 강화하십시오 . 성공 시 검의 등급과 가치가 상승하며 , 실패 시 무기는 파괴되어 사라집니다 .</p>
+            <p class="mb-5 text-[15px] leading-relaxed text-[#999]"><b class="text-[#d4af37] text-[17px]">2. 속성 부여 (1강)</b><br>Lv 0에서 첫 강화를 성공하는 순간 , 무기에 5대 속성 중 하나가 깃듭니다 . 부여된 속성은 도감 수집 시에도 동일하게 적용됩니다 .</p>
+        </div>
+        <button onclick="toggleOverlay('how-to-play', false)" class="mt-8 py-5 bg-yellow-800 text-black font-black rounded text-sm font-serif">확인</button>
+    </div>
+
+    <!-- 설정 -->
+    <div id="options" class="overlay justify-center px-10">
+        <h2 class="text-2xl font-black text-white mb-12 text-center uppercase tracking-[0.3em] font-serif">Settings</h2>
+        <div class="mb-10">
+            <div class="flex justify-between text-[11px] text-zinc-600 mb-4 font-bold uppercase tracking-widest">Master Volume <span id="v-val">80</span></div>
+            <input type="range" min="0" max="100" value="80" class="w-full" oninput="updateSettings('volume', this.value)">
+        </div>
+        <div class="mb-14">
+            <div class="flex justify-between text-[11px] text-zinc-600 mb-5 font-bold uppercase tracking-widest">Graphics Quality</div>
+            <div class="grid grid-cols-2 gap-3">
+                <button id="q-low" onclick="updateSettings('quality', 'LOW')" class="py-4 border border-zinc-900 text-zinc-700 font-bold text-xs rounded-sm">LOW</button>
+                <button id="q-high" onclick="updateSettings('quality', 'HIGH')" class="py-4 border border-yellow-800 text-yellow-800 font-bold text-xs rounded-sm bg-yellow-900/10">HIGH</button>
+            </div>
+        </div>
+        <button onclick="toggleOverlay('options', false)" class="py-5 bg-zinc-950 text-zinc-700 font-bold rounded text-[10px] uppercase">Done</button>
     </div>
 
     <div id="notification">
@@ -509,6 +548,9 @@
 </div>
 
 <script>
+    /**
+     * 인터랙티브 함수 전역 바인딩 (HTML onclick 참조 해결)
+     */
     const config = {
         attrs: ['불', '얼음', '대지', '암흑', '빛'],
         levels: [
@@ -524,192 +566,179 @@
             { chance: 25, cost: 1200000, atk: 18000, acc: 96 }
         ],
         getMult: (lv) => {
-            const table = { 1:0.8, 2:1.1, 3:1.5, 4:2.2, 5:3.2, 6:4.8, 7:7.5, 8:12, 9:22, 10:45 };
-            return table[lv] || 1;
+            const table = { 1: 0.8, 2: 1.1, 3: 1.5, 4: 2.2, 5: 3.2, 6: 4.8, 7: 7.5, 8: 12, 9: 22, 10: 45 };
+            return table[lv] ?? 1;
         }
     };
 
-    function getPath(lv, attr) {
+    const getPath = (lv, attr) => {
         if (lv === 0) return 'image/기본검.png';
-        let pre = attr === '불' ? '화염' : attr;
+        const pre = attr === '불' ? '화염' : attr;
         return `image/${pre}검${lv}.png`;
-    }
+    };
 
-    async function initLoading() {
-        const bar = document.getElementById('loading-bar');
-        let p = 0;
-        const interval = setInterval(() => { 
-            p += 2; 
-            if(p > 98) p = 98; 
-            if(bar) bar.style.width = p + '%'; 
-        }, 30);
+    window.startGame = () => { 
+        document.getElementById('main-menu')?.classList.remove('active'); 
+        document.getElementById('game-screen')?.classList.add('active'); 
+        window.updateUI(); 
+    };
 
-        // Firebase 로드가 완전히 끝날 때까지 대기
-        const check = setInterval(() => {
-            if (window.gameDB && window.gameDB.initialized) {
-                clearInterval(check);
-                clearInterval(interval);
-                if(bar) bar.style.width = '100%';
-                setTimeout(() => { 
-                    const loadingScreen = document.getElementById('loading-screen');
-                    const mainMenu = document.getElementById('main-menu');
-                    if (loadingScreen) loadingScreen.style.display = 'none'; 
-                    if (mainMenu) mainMenu.classList.add('active'); 
-                    updateUI();
-                }, 500);
-            }
-        }, 100);
-    }
-
-    function startGame() { 
-        const mainMenu = document.getElementById('main-menu');
-        const gameScreen = document.getElementById('game-screen');
-        if (mainMenu) mainMenu.classList.remove('active'); 
-        if (gameScreen) gameScreen.classList.add('active'); 
-        updateUI(); 
-    }
-
-    function exitToMain() { 
+    window.exitToMain = () => { 
         window.saveDataToCloud(); 
-        const gameScreen = document.getElementById('game-screen');
-        const mainMenu = document.getElementById('main-menu');
-        if (gameScreen) gameScreen.classList.remove('active'); 
-        if (mainMenu) mainMenu.classList.add('active'); 
-    }
+        document.getElementById('game-screen')?.classList.remove('active'); 
+        document.getElementById('main-menu')?.classList.add('active'); 
+    };
 
-    function updateUI() {
+    window.toggleOverlay = (overlayId, isVisible) => { 
+        if (overlayId === 'collection-overlay' && isVisible) window.renderCollectionGrid(); 
+        const target = document.getElementById(overlayId);
+        if (target) {
+            if (isVisible) target.classList.add('active');
+            else target.classList.remove('active');
+        }
+    };
+
+    window.updateUI = () => {
         const state = window.gameState;
-        const moneyDisp = document.getElementById('money-display');
-        const swordImg = document.getElementById('sword-img');
-        const nameDisp = document.getElementById('sword-name');
+        const moneyEl = document.getElementById('money-display');
+        const swordEl = document.getElementById('sword-img');
 
-        if (!moneyDisp || !state) return;
-        moneyDisp.textContent = state.money.toLocaleString() + ' KRW';
-        document.getElementById('level-display').textContent = 'Status: Lv. ' + state.lv;
-        swordImg.src = getPath(state.lv, state.attr);
+        if (!moneyEl || !state) return;
 
-        const data = state.lv < 10 ? config.levels[state.lv] : config.levels[9];
-        document.getElementById('stat-atk').textContent = data.atk.toLocaleString();
-        document.getElementById('stat-acc').textContent = data.acc + '%';
+        moneyEl.textContent = `${state.money.toLocaleString()} KRW`;
+        document.getElementById('level-display').textContent = `Status: Lv. ${state.lv}`;
+        swordEl.src = getPath(state.lv, state.attr);
+
+        const lvlData = state.lv < 10 ? config.levels[state.lv] : config.levels[9];
+        document.getElementById('stat-atk').textContent = lvlData.atk.toLocaleString();
+        document.getElementById('stat-acc').textContent = `${lvlData.acc}%`;
         
-        const chanceDisp = document.getElementById('chance-display');
-        const costDisp = document.getElementById('cost-display');
+        const cDisp = document.getElementById('chance-display');
+        const mDisp = document.getElementById('cost-display');
 
         if (state.lv < 10) {
-            chanceDisp.textContent = data.chance + '%';
-            costDisp.textContent = data.cost.toLocaleString() + ' G';
-            costDisp.style.color = state.money >= data.cost ? '#2d8a4e' : '#a33131';
+            cDisp.textContent = `${lvlData.chance}%`;
+            mDisp.textContent = `${lvlData.cost.toLocaleString()} G`;
+            mDisp.style.color = state.money >= lvlData.cost ? '#2d8a4e' : '#a33131';
         } else {
-            chanceDisp.textContent = 'MAX'; costDisp.textContent = '---';
+            cDisp.textContent = 'MAX';
+            mDisp.textContent = '---';
         }
 
+        const nEl = document.getElementById('sword-name');
+        const aEl = document.getElementById('sword-attr');
         if (state.lv === 0) {
-            nameDisp.textContent = '기본검'; 
-            document.getElementById('sword-attr').textContent = 'Normal Grade'; 
+            nEl.textContent = '기본검'; 
+            aEl.textContent = 'Normal Grade'; 
             document.getElementById('stat-opt').textContent = '없음';
         } else {
-            nameDisp.textContent = `${state.attr}검 +${state.lv}`;
-            document.getElementById('sword-attr').textContent = `${state.attr} Grade`;
+            nEl.textContent = `${state.attr}검 +${state.lv}`;
+            aEl.textContent = `${state.attr} Grade`;
             document.getElementById('stat-opt').textContent = `${state.attr} 속성 강화`;
         }
 
-        const sv = calculateSellValue();
+        const sv = Math.floor(state.spent * config.getMult(state.lv));
         document.getElementById('sell-hint').textContent = `Value: ${sv.toLocaleString()} Gold`;
         
         const key = `${state.attr}_${state.lv}`;
         const cb = document.getElementById('btn-collect');
         if (state.collection.includes(key)) { 
-            cb.textContent = '수집됨'; cb.disabled = true; cb.style.opacity = '0.3'; 
+            cb.textContent = '수집됨';
+            cb.disabled = true;
+            cb.style.opacity = '0.3'; 
         } else { 
-            cb.textContent = '도감수집'; cb.disabled = false; cb.style.opacity = '1'; 
+            cb.textContent = '도감수집';
+            cb.disabled = false;
+            cb.style.opacity = '1'; 
         }
 
         if (state.money < 100 && state.lv === 0) {
-            setTimeout(() => {
-                const bailout = document.getElementById('bailout-modal');
-                if (bailout) bailout.style.display = 'flex';
-            }, 1000);
+            setTimeout(() => document.getElementById('bailout-modal')?.classList.remove('hidden'), 1000);
         }
-    }
+    };
 
-    function calculateSellValue() {
-        const state = window.gameState;
-        if (state.lv === 0) return 0;
-        return Math.floor(state.spent * config.getMult(state.lv));
-    }
-
-    function enhanceSword() {
+    window.enhanceSword = async () => {
         const state = window.gameState;
         if (state.busy || state.lv >= 10) return;
+        
         const d = config.levels[state.lv];
-        if (state.money < d.cost) { showNoti('FAIL', '자금이 부족합니다 .', '#a33131'); return; }
+        if (state.money < d.cost) {
+            window.showNotification('FAIL', '자금이 부족합니다 .', '#a33131');
+            return;
+        }
 
-        state.busy = true; state.money -= d.cost; state.spent += d.cost; updateUI();
-        const swordImg = document.getElementById('sword-img');
-        swordImg.style.transform = 'scale(1.15) rotate(3deg)'; 
-        swordImg.style.filter = 'brightness(3)';
+        state.busy = true;
+        state.money -= d.cost;
+        state.spent += d.cost;
+        window.updateUI();
 
-        setTimeout(async () => {
+        const img = document.getElementById('sword-img');
+        img.style.transform = 'scale(1.15) rotate(3deg)'; 
+        img.style.filter = 'brightness(3)';
+
+        setTimeout(() => {
             if (Math.random() * 100 < d.chance) {
                 if (state.lv === 0) state.attr = config.attrs[Math.floor(Math.random() * config.attrs.length)];
                 state.lv++; 
-                showNoti('SUCCESS', '제련에 성공했습니다 .', '#2d8a4e');
+                window.showNotification('SUCCESS', '제련에 성공했습니다 .', '#2d8a4e');
             } else {
-                state.lv = 0; state.spent = 0; state.attr = '일반';
-                showNoti('FAILED', '무기가 파괴되었습니다 .', '#a33131');
+                state.lv = 0;
+                state.spent = 0;
+                state.attr = '일반';
+                window.showNotification('FAILED', '무기가 파괴되었습니다 .', '#a33131');
             }
             state.busy = false; 
-            swordImg.style.transform = 'scale(1)'; 
-            swordImg.style.filter = '';
-            updateUI(); 
+            img.style.transform = 'scale(1)'; 
+            img.style.filter = '';
+            window.updateUI(); 
             window.saveDataToCloud(); 
         }, 600);
-    }
+    };
 
-    function sellSword() {
+    window.sellSword = () => {
         if (window.gameState.lv === 0) return;
-        const v = calculateSellValue();
+        const v = Math.floor(window.gameState.spent * config.getMult(window.gameState.lv));
         window.gameState.money += v; 
-        showNoti('SOLD', `${v.toLocaleString()} KRW 획득 .`, '#2d8a4e');
-        reset();
-    }
+        window.showNotification('SOLD', `${v.toLocaleString()} KRW 획득 .`, '#2d8a4e');
+        window.resetSword();
+    };
 
-    function collectSword() {
-        const state = window.gameState;
-        const key = `${state.attr}_${state.lv}`;
-        if (state.collection.includes(key)) return;
-        state.collection.push(key);
-        showNoti('COLLECTED', '도감에 수집되었습니다 .', '#2d8a4e');
-        reset();
-    }
+    window.collectSword = () => {
+        const { attr, lv, collection } = window.gameState;
+        const key = `${attr}_${lv}`;
+        if (collection.includes(key)) return;
+        collection.push(key);
+        window.showNotification('COLLECTED', '도감에 수집되었습니다 .', '#2d8a4e');
+        window.resetSword();
+    };
 
-    function reset() { 
-        window.gameState.lv = 0; 
-        window.gameState.spent = 0; 
-        window.gameState.attr = '일반'; 
-        updateUI(); 
+    window.resetSword = () => { 
+        window.gameState.lv = 0;
+        window.gameState.spent = 0;
+        window.gameState.attr = '일반';
+        window.updateUI(); 
         window.saveDataToCloud(); 
-    }
+    };
 
-    function changeColTab(a) { 
-        window.gameState.tab = a; 
-        document.querySelectorAll('.c-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === a)); 
-        renderCol(); 
-    }
+    window.changeColTab = (category) => { 
+        window.gameState.tab = category; 
+        document.querySelectorAll('.c-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === category)); 
+        window.renderCollectionGrid(); 
+    };
 
-    function renderCol() {
+    window.renderCollectionGrid = () => {
         const grid = document.getElementById('col-list');
         if (!grid) return;
         grid.innerHTML = '';
         
-        const state = window.gameState;
-        let cCount = 0; 
-        let tCount = state.tab === '일반' ? 1 : 10;
+        const { tab, collection } = window.gameState;
+        let count = 0; 
+        const total = tab === '일반' ? 1 : 10;
         
-        if (state.tab === '일반') {
-            const has = state.collection.includes('일반_0'); 
-            if(has) cCount++;
-            grid.appendChild(createSlot('기본검', 0, '일반', !has));
+        if (tab === '일반') {
+            const has = collection.includes('일반_0'); 
+            if (has) count++;
+            grid.appendChild(window.createSlotEl('기본검', 0, '일반', !has));
             for(let i=0; i<8; i++) {
                 const empty = document.createElement('div');
                 empty.className = 'slot border-dashed border-zinc-900 opacity-10';
@@ -717,69 +746,88 @@
             }
         } else {
             for (let i = 1; i <= 10; i++) {
-                const has = state.collection.includes(`${state.tab}_${i}`); 
-                if(has) cCount++;
-                grid.appendChild(createSlot(`${state.tab}검`, i, state.tab, !has));
+                const has = collection.includes(`${tab}_${i}`); 
+                if (has) count++;
+                grid.appendChild(window.createSlotEl(`${tab}검`, i, tab, !has));
             }
         }
         
-        const rateText = document.getElementById('rate-text');
-        const progFill = document.getElementById('col-prog-fill');
-        const rate = Math.floor((cCount / tCount) * 100);
-        if (rateText) rateText.textContent = rate + '%';
-        if (progFill) progFill.style.width = rate + '%';
-    }
+        const rt = document.getElementById('rate-text');
+        const pf = document.getElementById('col-prog-fill');
+        const percent = Math.floor((count / total) * 100);
+        if (rt) rt.textContent = `${percent}%`;
+        if (pf) pf.style.width = `${percent}%`;
+    };
 
-    function createSlot(name, lv, attr, locked) {
-        const div = document.createElement('div');
-        div.className = `slot ${locked ? 'locked' : 'collected'}`;
-        div.innerHTML = `<img src="${getPath(lv, attr)}"><div class="slot-name">${locked ? 'LV.'+lv+' [ ? ]' : name+' +'+lv}</div>`;
-        return div;
-    }
+    window.createSlotEl = (label, lvl, attribute, isLocked) => {
+        const el = document.createElement('div');
+        el.className = `slot ${isLocked ? 'locked' : 'collected'}`;
+        el.innerHTML = `
+            <img src="${getPath(lvl, attribute)}" alt="${label}">
+            <div class="slot-name">${isLocked ? `LV.${lvl} [ ? ]` : `${label} +${lvl}`}</div>
+        `;
+        return el;
+    };
 
-    function toggleOverlay(id, show) { 
-        if(id === 'collection-overlay' && show) renderCol(); 
-        const el = document.getElementById(id);
-        if (el) el.classList.toggle('active', show);
-    }
-
-    function receiveBailout() { 
+    window.receiveBailout = () => { 
         window.gameState.money += 5000; 
-        const modal = document.getElementById('bailout-modal');
-        if (modal) modal.style.display = 'none'; 
-        updateUI(); 
+        document.getElementById('bailout-modal')?.classList.add('hidden'); 
+        window.updateUI(); 
         window.saveDataToCloud(); 
-    }
+    };
 
-    function updateSettings(key, val) {
-        window.gameState.settings[key] = val;
-        if (key === 'volume') {
-            const vVal = document.getElementById('v-val');
-            if (vVal) vVal.textContent = val;
-        } else if (key === 'quality') {
-            const isHigh = val === 'HIGH';
-            const qLow = document.getElementById('q-low');
-            const qHigh = document.getElementById('q-high');
-            if (qLow) qLow.className = isHigh ? 'py-4 border border-zinc-900 text-zinc-700 font-bold text-xs rounded-sm' : 'py-4 border border-yellow-700 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10';
-            if (qHigh) qHigh.className = isHigh ? 'py-4 border border-yellow-700 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10' : 'py-4 border border-zinc-800 text-zinc-700 font-bold text-xs rounded-sm';
-            const magicCircle = document.getElementById('magic-circle');
-            if (magicCircle) magicCircle.style.animation = isHigh ? 'rotate 60s linear infinite' : 'none';
+    window.updateSettings = (feature, value) => {
+        window.gameState.settings[feature] = value;
+        if (feature === 'volume') {
+            const label = document.getElementById('v-val');
+            if (label) label.textContent = value;
+        } else if (feature === 'quality') {
+            const isHigh = value === 'HIGH';
+            const btnL = document.getElementById('q-low');
+            const btnH = document.getElementById('q-high');
+            if (btnL) btnL.className = isHigh ? 'py-4 border border-zinc-900 text-zinc-700 font-bold text-xs rounded-sm' : 'py-4 border border-yellow-700 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10';
+            if (btnH) btnH.className = isHigh ? 'py-4 border border-yellow-700 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10' : 'py-4 border border-zinc-800 text-zinc-700 font-bold text-xs rounded-sm';
+            const mc = document.getElementById('magic-circle');
+            if (mc) mc.style.animation = isHigh ? 'rotate 60s linear infinite' : 'none';
         }
-    }
+    };
 
-    function showNoti(t, d, c) {
-        const n = document.getElementById('notification');
-        const nt = document.getElementById('noti-t');
-        const nd = document.getElementById('noti-d');
-        if (nt) { nt.textContent = t; nt.style.color = c; }
-        if (nd) nd.textContent = d;
-        if (n) {
-            n.classList.add('active'); 
-            setTimeout(() => n.classList.remove('active'), 1500);
+    window.showNotification = (title, desc, color) => {
+        const box = document.getElementById('notification');
+        const tEl = document.getElementById('noti-t');
+        const dEl = document.getElementById('noti-d');
+        if (tEl) { tEl.textContent = title; tEl.style.color = color; }
+        if (dEl) dEl.textContent = desc;
+        if (box) {
+            box.classList.add('active'); 
+            setTimeout(() => box.classList.remove('active'), 1500);
         }
-    }
+    };
 
-    window.onload = initLoading;
+    window.onload = () => {
+        const bar = document.getElementById('loading-bar');
+        let p = 0;
+        const timer = setInterval(() => { 
+            p += 1; 
+            if (p > 98) p = 98; 
+            if (bar) bar.style.width = `${p}%`; 
+        }, 20);
+
+        const checkSync = setInterval(() => {
+            if (window.gameDB?.initialized) {
+                clearInterval(checkSync);
+                clearInterval(timer);
+                if (bar) bar.style.width = '100%';
+                setTimeout(() => { 
+                    const ls = document.getElementById('loading-screen');
+                    const mm = document.getElementById('main-menu');
+                    if (ls) ls.style.display = 'none'; 
+                    if (mm) mm.classList.add('active'); 
+                    window.updateUI();
+                }, 400);
+            }
+        }, 50);
+    };
 </script>
 </body>
 </html>
