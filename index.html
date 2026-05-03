@@ -9,7 +9,6 @@
     <script>
         /**
          * 전역 상태 초기화
-         * 모든 스크립트 블록에서 즉시 접근 가능한 최신 객체 구조 적용
          */
         window.gameState = {
             money: 10000,
@@ -21,115 +20,54 @@
             busy: false,
             settings: { volume: 80, quality: 'HIGH' }
         };
-        window.gameDB = { initialized: false, offline: false, userId: null };
-    </script>
-
-    <!-- Firebase SDK (최신 ES 모듈 방식) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         /**
-         * Firebase 시스템 초기화 및 데이터 동기화 최적화
+         * 로컬 저장소로부터 데이터 불러오기
          */
-        const initFirebaseSystem = async () => {
+        window.loadDataFromLocal = () => {
             try {
-                if (typeof __firebase_config === 'undefined') {
-                    throw new Error("환경 변수 누락");
+                const savedData = localStorage.getItem('legendarySmithSave');
+                if (savedData) {
+                    const d = JSON.parse(savedData);
+                    window.gameState.money = d.money ?? 10000;
+                    window.gameState.lv = d.lv ?? 0;
+                    window.gameState.spent = d.spent ?? 0;
+                    window.gameState.attr = d.attr ?? '일반';
+                    window.gameState.collection = d.collection ?? [];
+                    if (d.settings) window.gameState.settings = d.settings;
+                    console.log("로컬 데이터 로드 완료");
                 }
-                
-                const firebaseConfig = JSON.parse(__firebase_config);
-                const app = initializeApp(firebaseConfig);
-                const auth = getAuth(app);
-                const db = getFirestore(app);
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-                // 브라우저 세션 영속성 강화 (새로고침 시 로그인 유지)
-                await setPersistence(auth, browserLocalPersistence);
-
-                // 최신 인증 감시 로직
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        window.gameDB = { 
-                            db, auth, appId, userId: user.uid, doc, getDoc, setDoc, 
-                            initialized: false, 
-                            offline: false 
-                        };
-                        
-                        // 클라우드 데이터 동기화 대기
-                        await window.syncDataFromCloud();
-                        window.gameDB.initialized = true;
-                        console.log("Modern Cloud Persistence Active");
-                    } else {
-                        // 익명 세션 생성
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    }
-                });
-                
-            } catch (error) {
-                console.warn("Offline Fallback Mode :", error.message);
-                window.gameDB.initialized = true; 
-                window.gameDB.offline = true;
+            } catch (e) {
+                console.error("데이터 불러오기 실패 :", e);
             }
         };
 
         /**
-         * 클라우드 데이터 로드 (최신 비동기 패턴)
+         * 로컬 저장소에 현재 상태 저장하기
          */
-        window.syncDataFromCloud = async () => {
-            if (!window.gameDB || window.gameDB.offline || !window.gameDB.userId) return;
-            const { db, appId, userId, doc, getDoc } = window.gameDB;
-            
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'gameData', 'savefile');
-                const snap = await getDoc(docRef);
-                
-                if (snap.exists()) {
-                    const cloudData = snap.data();
-                    window.gameState.money = cloudData.money ?? 10000;
-                    window.gameState.lv = cloudData.lv ?? 0;
-                    window.gameState.spent = cloudData.spent ?? 0;
-                    window.gameState.attr = cloudData.attr ?? '일반';
-                    window.gameState.collection = cloudData.collection ?? [];
-                }
-            } catch (error) {
-                console.error("Cloud Sync Load Failed :", error);
-            }
-        };
-
-        /**
-         * 실시간 클라우드 저장
-         */
-        window.saveDataToCloud = async () => {
-            if (!window.gameDB?.initialized || window.gameDB.offline || !window.gameDB.userId) return;
-            const { db, appId, userId, doc, setDoc } = window.gameDB;
-            
+        window.saveDataToLocal = () => {
             const indicator = document.getElementById('save-indicator');
             if (indicator) indicator.style.display = 'block';
 
             try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'gameData', 'savefile');
-                await setDoc(docRef, {
+                const dataToSave = {
                     money: window.gameState.money,
                     lv: window.gameState.lv,
                     spent: window.gameState.spent,
                     attr: window.gameState.attr,
                     collection: window.gameState.collection,
-                    lastUpdate: Date.now()
-                });
+                    settings: window.gameState.settings,
+                    ts: Date.now()
+                };
+                localStorage.setItem('legendarySmithSave', JSON.stringify(dataToSave));
                 if (indicator) setTimeout(() => indicator.style.display = 'none', 800);
-            } catch (error) {
-                console.error("Cloud Sync Save Failed :", error);
+            } catch (e) {
+                console.error("데이터 저장 실패 :", e);
+                if (indicator) indicator.textContent = "저장 실패";
             }
         };
-
-        initFirebaseSystem();
     </script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&family=Nanum+Myeongjo:wght@700;800&display=swap');
 
@@ -337,7 +275,7 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 12px;
-            row-gap: 65px; /* 레이아웃 겹침 방지 여백 확보 */
+            row-gap: 65px; 
             padding: 15px 0 40px 0;
             overflow-y: auto;
             align-content: start;
@@ -414,7 +352,7 @@
 <body>
 
 <div id="game-container">
-    <div id="save-indicator" class="absolute top-3 left-1/2 -translate-x-1/2 text-[8px] text-zinc-800 italic hidden z-50 uppercase font-black tracking-widest">Cloud Syncing...</div>
+    <div id="save-indicator" class="absolute top-3 left-1/2 -translate-x-1/2 text-[8px] text-zinc-800 italic hidden z-50 uppercase font-black tracking-widest">Saving...</div>
 
     <!-- 로딩 화면 -->
     <div id="loading-screen" class="screen active">
@@ -422,7 +360,7 @@
         <div class="w-44 h-0.5 bg-zinc-900 mt-8 rounded-full overflow-hidden border border-zinc-900">
             <div id="loading-bar" class="h-full bg-yellow-800 w-0 transition-all duration-300"></div>
         </div>
-        <p class="mt-4 text-[9px] text-zinc-700 font-bold uppercase tracking-[0.4em]">클라우드 데이터를 동기화 중...</p>
+        <p class="mt-4 text-[9px] text-zinc-700 font-bold uppercase tracking-[0.4em]">저장된 데이터를 불러오는 중...</p>
     </div>
 
     <!-- 메인 메뉴 -->
@@ -435,7 +373,7 @@
         <button onclick="toggleOverlay('collection-overlay', true)" class="menu-btn">수집한 유산 (도감)</button>
         <button onclick="toggleOverlay('how-to-play', true)" class="menu-btn">제련의 비기 (가이드)</button>
         <button onclick="toggleOverlay('options', true)" class="menu-btn">장인 설정 (옵션)</button>
-        <p class="mt-12 text-[9px] text-zinc-800 font-black uppercase tracking-widest">Version 3.6.0 | ES2024 Final Engine</p>
+        <p class="mt-12 text-[9px] text-zinc-800 font-black uppercase tracking-widest">Version 4.0.0 | Local Storage Mode</p>
     </div>
 
     <!-- 인게임 화면 -->
@@ -549,7 +487,7 @@
 
 <script>
     /**
-     * 인터랙티브 함수 전역 바인딩 (HTML onclick 참조 해결)
+     * 인터랙션 함수 전역 바인딩
      */
     const config = {
         attrs: ['불', '얼음', '대지', '암흑', '빛'],
@@ -584,7 +522,7 @@
     };
 
     window.exitToMain = () => { 
-        window.saveDataToCloud(); 
+        window.saveDataToLocal(); 
         document.getElementById('game-screen')?.classList.remove('active'); 
         document.getElementById('main-menu')?.classList.add('active'); 
     };
@@ -600,29 +538,29 @@
 
     window.updateUI = () => {
         const state = window.gameState;
-        const moneyEl = document.getElementById('money-display');
-        const swordEl = document.getElementById('sword-img');
+        const mEl = document.getElementById('money-display');
+        const sEl = document.getElementById('sword-img');
 
-        if (!moneyEl || !state) return;
+        if (!mEl || !state) return;
 
-        moneyEl.textContent = `${state.money.toLocaleString()} KRW`;
+        mEl.textContent = `${state.money.toLocaleString()} KRW`;
         document.getElementById('level-display').textContent = `Status: Lv. ${state.lv}`;
-        swordEl.src = getPath(state.lv, state.attr);
+        sEl.src = getPath(state.lv, state.attr);
 
-        const lvlData = state.lv < 10 ? config.levels[state.lv] : config.levels[9];
-        document.getElementById('stat-atk').textContent = lvlData.atk.toLocaleString();
-        document.getElementById('stat-acc').textContent = `${lvlData.acc}%`;
+        const d = state.lv < 10 ? config.levels[state.lv] : config.levels[9];
+        document.getElementById('stat-atk').textContent = d.atk.toLocaleString();
+        document.getElementById('stat-acc').textContent = `${d.acc}%`;
         
-        const cDisp = document.getElementById('chance-display');
-        const mDisp = document.getElementById('cost-display');
+        const cD = document.getElementById('chance-display');
+        const mD = document.getElementById('cost-display');
 
         if (state.lv < 10) {
-            cDisp.textContent = `${lvlData.chance}%`;
-            mDisp.textContent = `${lvlData.cost.toLocaleString()} G`;
-            mDisp.style.color = state.money >= lvlData.cost ? '#2d8a4e' : '#a33131';
+            cD.textContent = `${d.chance}%`;
+            mD.textContent = `${d.cost.toLocaleString()} G`;
+            mD.style.color = state.money >= d.cost ? '#2d8a4e' : '#a33131';
         } else {
-            cDisp.textContent = 'MAX';
-            mDisp.textContent = '---';
+            cD.textContent = 'MAX';
+            mD.textContent = '---';
         }
 
         const nEl = document.getElementById('sword-name');
@@ -691,7 +629,7 @@
             img.style.transform = 'scale(1)'; 
             img.style.filter = '';
             window.updateUI(); 
-            window.saveDataToCloud(); 
+            window.saveDataToLocal(); 
         }, 600);
     };
 
@@ -717,7 +655,7 @@
         window.gameState.spent = 0;
         window.gameState.attr = '일반';
         window.updateUI(); 
-        window.saveDataToCloud(); 
+        window.saveDataToLocal(); 
     };
 
     window.changeColTab = (category) => { 
@@ -773,7 +711,7 @@
         window.gameState.money += 5000; 
         document.getElementById('bailout-modal')?.classList.add('hidden'); 
         window.updateUI(); 
-        window.saveDataToCloud(); 
+        window.saveDataToLocal(); 
     };
 
     window.updateSettings = (feature, value) => {
@@ -807,17 +745,17 @@
     window.onload = () => {
         const bar = document.getElementById('loading-bar');
         let p = 0;
+        
         const timer = setInterval(() => { 
-            p += 1; 
-            if (p > 98) p = 98; 
-            if (bar) bar.style.width = `${p}%`; 
-        }, 20);
-
-        const checkSync = setInterval(() => {
-            if (window.gameDB?.initialized) {
-                clearInterval(checkSync);
+            p += 2; 
+            if (p >= 100) {
+                p = 100;
                 clearInterval(timer);
                 if (bar) bar.style.width = '100%';
+                
+                // 로딩이 완료되면 로컬 데이터 불러오기 실행
+                window.loadDataFromLocal();
+                
                 setTimeout(() => { 
                     const ls = document.getElementById('loading-screen');
                     const mm = document.getElementById('main-menu');
@@ -825,8 +763,10 @@
                     if (mm) mm.classList.add('active'); 
                     window.updateUI();
                 }, 400);
+            } else {
+                if (bar) bar.style.width = `${p}%`; 
             }
-        }, 50);
+        }, 15);
     };
 </script>
 </body>
