@@ -11,7 +11,6 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 전역 에러 핸들링 및 초기화
         window.gameDB = { initialized: false, error: null };
         
         async function initFirebase() {
@@ -28,20 +27,21 @@
             } catch (e) {
                 console.warn("Firebase fallback mode:", e.message);
                 window.gameDB.error = e.message;
-                window.gameDB.initialized = true; // 에러가 나도 로컬로 진행되게 true 처리
+                window.gameDB.initialized = true; 
                 window.gameDB.offline = true;
             }
         }
         initFirebase();
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&family=Nanum+Myeongjo:wght@700;800&display=swap');
 
         :root {
-            --bg-dark: #0a0a0a;
-            --panel-gold: #8b6b3e;
-            --inner-shadow: inset 0 0 15px rgba(0,0,0,0.8);
-            --fantasy-border: 2px solid #3a2a1a;
+            --gold: #d4af37;
+            --dark-gold: #8b6b3e;
+            --panel-bg: rgba(10, 8, 6, 0.98);
+            --border-fantasy: #3a2a1a;
+            --inner-shadow: inset 0 0 20px rgba(0,0,0,0.95);
         }
 
         body {
@@ -63,13 +63,15 @@
             width: 100%;
             max-width: 420px;
             height: 100%;
-            max-height: 800px;
+            max-height: 100vh;
             aspect-ratio: 9 / 16;
             position: relative;
             background: radial-gradient(circle at center, #1a1010 0%, #050505 100%);
             border: 4px double #2a1a1a;
+            outline: 2px solid var(--dark-gold);
+            outline-offset: -8px;
             overflow: hidden;
-            box-shadow: 0 0 60px rgba(0,0,0,1);
+            box-shadow: 0 0 80px rgba(0,0,0,1);
             display: flex;
             flex-direction: column;
         }
@@ -84,34 +86,43 @@
 
         .screen.active { display: flex; }
 
+        /* 로딩 화면 */
         #loading-screen { background: #000; z-index: 1000; justify-content: center; align-items: center; }
 
+        /* 메인 메뉴 */
         #main-menu { background: rgba(0,0,0,0.9); justify-content: center; align-items: center; text-align: center; }
 
         .menu-btn {
-            width: 220px;
-            padding: 14px;
+            width: 240px;
+            padding: 16px;
             margin-bottom: 12px;
             border-radius: 4px;
             font-weight: 900;
             transition: all 0.2s;
             text-transform: uppercase;
             border: 1px solid #4a3a2a;
-            background: #1a1510;
-            color: #d4af37;
+            background: linear-gradient(to bottom, #1a1510, #0a0500);
+            color: var(--gold);
+            font-family: 'Nanum Myeongjo', serif;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
-        .menu-btn:hover { background: #2a201a; border-color: #8b6b3e; }
-        .menu-btn.btn-main { background: #d4af37; color: #1a1010; border: none; }
+        .menu-btn:hover { border-color: var(--gold); transform: translateY(-2px); }
+        .menu-btn.btn-main { background: var(--gold); color: #1a1010; border: none; font-size: 1.1rem; }
         .menu-btn:active { transform: scale(0.96); }
 
         .status-header {
-            padding: 15px 20px;
+            padding: 20px 25px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            align-items: flex-start;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+            z-index: 20;
+            flex-shrink: 0;
         }
+
+        .money-label { font-size: 10px; color: #777; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; }
+        .money-value { font-size: 1.25rem; font-weight: 900; color: var(--gold); font-family: 'Nanum Myeongjo', serif; line-height: 1; margin-top: 2px; }
 
         .sword-display {
             position: relative;
@@ -120,13 +131,15 @@
             justify-content: center;
             align-items: center;
             flex-direction: column;
+            min-height: 0;
+            padding-bottom: 10px;
         }
 
         .magic-circle {
             position: absolute;
-            width: 260px;
-            height: 260px;
-            border: 2px dashed rgba(139, 107, 62, 0.2);
+            width: 75%;
+            aspect-ratio: 1/1;
+            border: 1px dashed rgba(212, 175, 55, 0.1);
             border-radius: 50%;
             animation: rotate 60s linear infinite;
         }
@@ -134,199 +147,250 @@
         @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .sword-image {
-            width: 240px;
-            height: 240px;
+            width: 100%;
+            height: 55%;
             object-fit: contain;
             z-index: 20;
-            filter: drop-shadow(0 0 20px rgba(0, 0, 0, 1));
+            filter: drop-shadow(0 0 30px rgba(0, 0, 0, 0.8));
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
+        .sword-info { text-align: center; z-index: 25; margin-top: 15px; width: 100%; padding: 0 20px; }
+        .sword-rank { font-size: 11px; font-weight: 900; color: #555; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 4px; }
+        .sword-name { font-size: 1.8rem; font-weight: 900; color: #fff; font-family: 'Nanum Myeongjo', serif; text-shadow: 0 2px 10px rgba(0,0,0,0.8); white-space: nowrap; }
+        .sword-grade { font-size: 9px; font-weight: 900; color: #800; text-transform: uppercase; letter-spacing: 0.4em; margin-top: 6px; }
+
         .stats-panel {
-            padding: 12px 20px;
-            background: rgba(20, 15, 10, 0.7);
-            border-top: 1px solid #3a2a1a;
-            border-bottom: 1px solid #3a2a1a;
-            font-size: 0.8rem;
+            margin: 0 20px;
+            padding: 15px 20px;
+            background: rgba(20, 15, 12, 0.8);
+            border: 1px solid #3a2a1a;
+            border-radius: 8px;
+            box-shadow: var(--inner-shadow);
+            flex-shrink: 0;
         }
 
-        .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; color: #a1a1a1; }
-        .stat-value { color: #f0e68c; font-weight: 800; }
+        .stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .stat-row:last-child { margin-bottom: 0; }
+        .stat-label { font-size: 11px; color: #666; font-weight: 700; }
+        .stat-value { font-size: 13px; color: #f0e68c; font-weight: 900; font-family: 'Nanum Myeongjo', serif; }
 
         .action-panel {
-            padding: 15px 20px 30px 20px;
-            background: #0f0c0a;
+            padding: 20px 25px 35px 25px;
+            background: #0d0b09;
             border-top: 2px solid #2a1a1a;
             border-radius: 25px 25px 0 0;
             flex-shrink: 0;
+            z-index: 30;
         }
+
+        .cost-chance-box { display: flex; justify-content: space-between; margin-bottom: 15px; }
+        .info-group { display: flex; flex-direction: column; }
+        .info-group.right { align-items: flex-end; }
+        .info-label { font-size: 9px; color: #555; font-weight: 900; text-transform: uppercase; margin-bottom: 2px; }
+        .info-val { font-size: 16px; font-weight: 900; font-family: 'Nanum Myeongjo', serif; }
+        .info-val.success { color: #2d8a4e; }
+        .info-val.cost { color: #a33131; }
+
+        .btn-enhance {
+            width: 100%;
+            padding: 18px;
+            border-radius: 8px;
+            font-size: 1.4rem;
+            font-weight: 900;
+            font-family: 'Nanum Myeongjo', serif;
+            background: linear-gradient(135deg, #b8860b, #8b4513);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5), inset 0 0 10px rgba(255,255,255,0.2);
+            margin-bottom: 12px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .btn-enhance:active { transform: scale(0.97); filter: brightness(1.1); }
+
+        .secondary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn-sec {
+            padding: 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 900;
+            background: #151210;
+            border: 1px solid #332a25;
+            color: #666;
+            transition: all 0.2s;
+        }
+        .btn-sec:active { transform: scale(0.96); background: #201a16; }
+        .btn-sec.collect { color: var(--dark-gold); border-color: var(--dark-gold); }
+
+        .market-hint { font-size: 9px; color: #333; text-align: center; margin-top: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
 
         .overlay {
             position: absolute;
             inset: 0;
-            background: rgba(5, 5, 5, 0.98);
+            background: rgba(8, 6, 4, 0.99);
             z-index: 200;
             display: none;
             flex-direction: column;
-            padding: 20px;
+            padding: 35px 25px;
         }
 
         .overlay.active { display: flex; }
 
-        /* RPG 컬렉션 UI */
+        /* 도감 UI */
         .collection-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            padding: 5px;
+            gap: 12px;
+            padding: 10px 0;
+            overflow-y: auto;
         }
 
         .slot {
-            aspect-ratio: 1;
-            background: #111;
-            border: 2px solid #2a1a1a;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: #0a0a0a;
+            border: 2px solid #221a15;
             border-radius: 4px;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
             position: relative;
-            box-shadow: var(--inner-shadow);
+            box-shadow: inset 0 0 10px #000;
+            overflow: hidden; /* 슬롯 밖으로 나가는 이미지 차단 */
         }
-
-        .slot.collected { border-color: #8b6b3e; background: #1a1510; }
-
-        .slot img { width: 85%; height: 85%; object-fit: contain; z-index: 5; }
+        .slot.collected { border-color: var(--dark-gold); background: #151210; }
+        
+        /* 도감 내 이미지 크기 최적화 - 모든 아이템 동일 크기 강제 */
+        .slot img { 
+            max-width: 75%; 
+            max-height: 75%; 
+            width: auto;
+            height: auto;
+            object-fit: contain; 
+            z-index: 5; 
+        }
         
         .slot.locked img { display: none; }
-        .slot.locked::after {
-            content: '?';
-            font-size: 2.5rem;
-            font-weight: 900;
-            color: #222;
-            position: absolute;
-            z-index: 2;
-        }
+        .slot.locked::after { content: '?'; font-size: 2.2rem; font-weight: 900; color: #151515; position: absolute; }
+        .slot-name { position: absolute; bottom: 0; width: 100%; font-size: 7px; text-align: center; background: rgba(0,0,0,0.8); padding: 3px 0; color: #444; font-weight: 900; z-index: 10; }
+        .slot.collected .slot-name { color: var(--gold); }
 
-        .slot-name {
-            position: absolute;
-            bottom: 0;
-            width: 100%;
-            font-size: 7px;
-            text-align: center;
-            background: rgba(0,0,0,0.7);
-            padding: 2px 0;
-            color: #666;
-            z-index: 10;
-        }
+        .prog-bar { width: 100%; height: 8px; background: #000; border: 1px solid #222; margin: 15px 0; border-radius: 4px; overflow: hidden; flex-shrink: 0; }
+        .prog-fill { height: 100%; background: linear-gradient(to right, #8b4513, var(--gold)); width: 0%; transition: width 1s ease-out; }
 
-        .slot.collected .slot-name { color: #d4af37; }
-
-        .prog-bar {
-            width: 100%;
-            height: 8px;
-            background: #111;
-            border-radius: 4px;
-            border: 1px solid #333;
-            margin: 10px 0;
-            overflow: hidden;
-        }
-
-        .prog-fill { height: 100%; background: linear-gradient(to right, #8b6b3e, #d4af37); width: 0%; transition: width 1s; }
+        .tabs { display: flex; gap: 0; border: 1px solid #221a15; border-radius: 4px; overflow: hidden; flex-shrink: 0; margin-bottom: 15px; }
+        .tab-btn { flex: 1; padding: 12px 0; font-size: 10px; font-weight: 900; background: #111; color: #555; transition: all 0.2s; }
+        .tab-btn.active { background: var(--dark-gold); color: #000; }
 
         #notification {
             position: absolute;
-            top: 35%;
+            top: 40%;
             left: 50%;
             transform: translate(-50%, -50%) scale(0.8);
-            background: rgba(10, 5, 0, 0.95);
-            padding: 15px 30px;
-            border-radius: 8px;
-            border: 1px solid #8b6b3e;
+            background: rgba(10, 8, 5, 0.98);
+            padding: 20px 40px;
+            border: 1px solid var(--gold);
             z-index: 2000;
             opacity: 0;
             pointer-events: none;
-            transition: all 0.3s;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             text-align: center;
         }
-
         #notification.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+        .guide-text p { margin-bottom: 20px; font-size: 0.95rem; line-height: 1.6; color: #999; }
+        .guide-text b { color: var(--gold); font-size: 1.1rem; }
+
+        input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #222; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; border: 1px solid var(--gold); height: 16px; width: 16px; border-radius: 50%; background: #000; margin-top: -6px; cursor: pointer; }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body>
 
 <div id="game-container">
-    <div id="save-indicator" class="absolute top-2 left-1/2 -translate-x-1/2 text-[9px] text-zinc-700 italic hidden z-50">SYNCING...</div>
+    <div id="save-indicator" class="absolute top-3 left-1/2 -translate-x-1/2 text-[8px] text-zinc-800 italic hidden z-50 uppercase font-black">Syncing...</div>
 
     <!-- 로딩 화면 -->
     <div id="loading-screen" class="screen active">
-        <h1 class="text-2xl font-black italic text-zinc-400 tracking-tighter">FORGING DATA</h1>
-        <div class="w-40 h-1 bg-zinc-900 mt-6 rounded-full overflow-hidden">
-            <div id="loading-bar" class="h-full bg-yellow-700 w-0 transition-all duration-300"></div>
+        <h1 class="text-3xl font-black italic text-zinc-600 tracking-tighter font-serif">LEGENDARY SMITH</h1>
+        <div class="w-44 h-0.5 bg-zinc-900 mt-8 rounded-full overflow-hidden border border-zinc-900">
+            <div id="loading-bar" class="h-full bg-yellow-800 w-0 transition-all duration-300"></div>
         </div>
+        <p class="mt-4 text-[9px] text-zinc-700 font-bold uppercase tracking-[0.4em]">제련소를 정비하는 중...</p>
     </div>
 
     <!-- 메인 메뉴 -->
     <div id="main-menu" class="screen">
-        <div class="mb-12">
-            <h1 class="text-4xl font-black text-white italic tracking-tighter">검 강화하기</h1>
-            <p class="text-yellow-700 mt-1 font-bold uppercase tracking-[0.3em] text-[8px]">The Legendary Smith</p>
+        <div class="mb-16">
+            <h1 class="text-5xl font-black text-white italic tracking-tighter font-serif">검 강화하기</h1>
+            <p class="text-yellow-800 mt-2 font-bold uppercase tracking-[0.4em] text-[10px]">Master of the Forge</p>
         </div>
-        <button onclick="startGame()" class="menu-btn btn-main">게임 시작</button>
-        <button onclick="toggleOverlay('collection-overlay', true)" class="menu-btn">무기 도감</button>
-        <button onclick="toggleOverlay('how-to-play', true)" class="menu-btn">게임 방법</button>
-        <button onclick="toggleOverlay('options', true)" class="menu-btn">시스템 설정</button>
+        <button onclick="startGame()" class="menu-btn btn-main">대장간 입장 (시작)</button>
+        <button onclick="toggleOverlay('collection-overlay', true)" class="menu-btn">수집한 유산 (도감)</button>
+        <button onclick="toggleOverlay('how-to-play', true)" class="menu-btn">제련의 비기 (가이드)</button>
+        <button onclick="toggleOverlay('options', true)" class="menu-btn">장인 설정 (옵션)</button>
+        <p class="mt-12 text-[9px] text-zinc-800 font-black uppercase tracking-widest">Version 2.6.0 | Fixed UI Edition</p>
     </div>
 
-    <!-- 인게임 -->
+    <!-- 인게임 화면 -->
     <div id="game-screen" class="screen">
         <div class="status-header">
             <div>
-                <p class="text-[9px] text-zinc-600 font-black uppercase mb-1">Balance</p>
-                <p id="money-display" class="text-lg font-black text-yellow-600">10,000 KRW</p>
+                <p class="money-label">Current Balance</p>
+                <p id="money-display" class="money-value">10,000 KRW</p>
             </div>
-            <button onclick="exitToMain()" class="text-[8px] border border-zinc-800 px-4 py-1 rounded-full text-zinc-500 font-bold active:scale-95">EXIT</button>
+            <button onclick="exitToMain()" class="text-[9px] border border-zinc-900 px-4 py-2 rounded text-zinc-600 font-black hover:bg-zinc-950">EXIT</button>
         </div>
 
         <div class="sword-display">
-            <div class="magic-circle"></div>
+            <div id="magic-circle" class="magic-circle"></div>
             <img id="sword-img" src="image/기본검.png" alt="Sword" class="sword-image">
-            <div class="text-center z-20 mt-4">
-                <p id="level-display" class="text-xs font-black italic text-zinc-600 mb-1">LV. 0</p>
-                <h2 id="sword-name" class="text-2xl font-black text-white">기본검</h2>
-                <p id="sword-attr" class="text-[9px] text-red-800 font-black uppercase tracking-[0.4em] mt-1">Normal Grade</p>
+            <div class="sword-info">
+                <p id="level-display" class="sword-rank">Status: Lv. 0</p>
+                <h2 id="sword-name" class="sword-name">기본검</h2>
+                <p id="sword-attr" class="sword-grade">Normal Grade</p>
             </div>
         </div>
 
         <div class="stats-panel">
-            <div class="stat-row"><span>공격력</span><span id="stat-atk" class="stat-value">10</span></div>
-            <div class="stat-row"><span>명중률</span><span id="stat-acc" class="stat-value">85%</span></div>
-            <div class="stat-row"><span>속성 강화</span><span id="stat-opt" class="stat-value">없음</span></div>
+            <div class="stat-row"><span class="stat-label">물리 공격력 (Atk)</span><span id="stat-atk" class="stat-value">10</span></div>
+            <div class="stat-row"><span class="stat-label">명중 보정 (Acc)</span><span id="stat-acc" class="stat-value">85%</span></div>
+            <div class="stat-row"><span class="stat-label">부여된 속성</span><span id="stat-opt" class="stat-value">없음</span></div>
         </div>
 
         <div class="action-panel">
-            <div class="flex justify-between mb-4 px-1 text-xs">
-                <div><p class="text-zinc-600 text-[8px] uppercase">Chance</p><p id="chance-display" class="font-black text-green-700">100%</p></div>
-                <div class="text-right"><p class="text-zinc-600 text-[8px] uppercase">Cost</p><p id="cost-display" class="font-black text-red-700">100 KRW</p></div>
+            <div class="cost-chance-box">
+                <div class="info-group">
+                    <p class="info-label">Success Rate</p>
+                    <p id="chance-display" class="info-val success">100%</p>
+                </div>
+                <div class="info-group right">
+                    <p class="info-label">Enchant Cost</p>
+                    <p id="cost-display" class="info-val cost">100 G</p>
+                </div>
             </div>
-            <button onclick="enhanceSword()" class="w-full py-4 rounded-lg font-black text-lg mb-3 bg-gradient-to-br from-yellow-700 to-yellow-900 border border-yellow-600/30 active:scale-95 transition-all shadow-lg">강화하기</button>
-            <div class="grid grid-cols-2 gap-2">
-                <button onclick="sellSword()" class="py-3 rounded-lg font-black text-xs bg-zinc-900 border border-zinc-800 text-zinc-500 active:scale-95">판매하기</button>
-                <button id="btn-collect" onclick="collectSword()" class="py-3 rounded-lg font-black text-xs bg-yellow-900/10 border border-yellow-700/20 text-yellow-700 active:scale-95">도감수집</button>
+            <button onclick="enhanceSword()" class="btn-enhance">강 화 하 기</button>
+            <div class="secondary-actions">
+                <button onclick="sellSword()" class="btn-sec">판매하기</button>
+                <button id="btn-collect" onclick="collectSword()" class="btn-sec collect">도감수집</button>
             </div>
-            <p id="sell-hint" class="text-[8px] text-zinc-700 mt-3 text-center font-bold">판매 예상가: 0 KRW</p>
+            <p id="sell-hint" class="market-hint">마켓 가치: 0 Gold</p>
         </div>
     </div>
 
     <!-- 도감 오버레이 -->
     <div id="collection-overlay" class="overlay">
-        <div class="flex justify-between items-end mb-2">
-            <h2 class="text-xl font-black text-yellow-700 italic uppercase">Arsenal</h2>
-            <p id="rate-text" class="text-xs font-black text-zinc-500">0%</p>
+        <div class="flex justify-between items-end mb-4 border-b border-zinc-900 pb-2">
+            <h2 class="text-2xl font-black text-yellow-800 italic font-serif">무기 도감</h2>
+            <p id="rate-text" class="text-sm font-black text-zinc-700">0%</p>
         </div>
         <div class="prog-bar"><div id="prog-fill" class="prog-fill"></div></div>
         
-        <div class="flex gap-1 mb-4">
+        <div class="tabs">
             <button onclick="changeColTab('일반')" class="tab-btn active c-tab" data-tab="일반">Normal</button>
             <button onclick="changeColTab('불')" class="tab-btn c-tab" data-tab="불">Fire</button>
             <button onclick="changeColTab('얼음')" class="tab-btn c-tab" data-tab="얼음">Ice</button>
@@ -335,46 +399,55 @@
             <button onclick="changeColTab('빛')" class="tab-btn c-tab" data-tab="빛">Light</button>
         </div>
 
-        <div id="col-list" class="flex-1 overflow-y-auto collection-grid no-scrollbar">
+        <div id="col-list" class="flex-1 overflow-y-auto no-scrollbar collection-grid">
             <!-- JS 동적 생성 -->
         </div>
-        <button onclick="toggleOverlay('collection-overlay', false)" class="mt-4 py-4 bg-zinc-900 text-zinc-500 font-bold rounded text-xs active:scale-95">CLOSE</button>
+        <button onclick="toggleOverlay('collection-overlay', false)" class="mt-6 py-4 bg-zinc-950 text-zinc-700 font-bold rounded text-[10px] uppercase tracking-widest">Back</button>
     </div>
 
-    <!-- 시스템 가이드 -->
-    <div id="how-to-play" class="overlay justify-center items-center">
-        <h2 class="text-xl font-black text-white mb-6 border-b border-zinc-800 w-full text-center pb-2">가이드</h2>
-        <div class="text-[10px] text-zinc-500 leading-loose text-center px-4">
-            <p>1. 강화 성공 시 무기의 가치가 상승합니다.</p>
-            <p>2. 1강 시 5가지 속성 중 하나가 무작위로 부여됩니다.</p>
-            <p>3. **도감수집** 시 해당 무기는 사라지며 영구 기록됩니다.</p>
-            <p>4. 고단계 무기일수록 판매 시 막대한 수익을 얻습니다.</p>
+    <!-- 게임 방법 -->
+    <div id="how-to-play" class="overlay">
+        <h2 class="text-2xl font-black text-white mb-10 border-b border-zinc-900 w-full text-center pb-4 font-serif">제련의 비결 (가이드)</h2>
+        <div class="guide-text flex-1 overflow-y-auto px-4 no-scrollbar">
+            <p><b>1. 강화의 기초</b><br>보유한 금전을 소모하여 검을 강화하십시오. 성공 시 검의 등급과 가치가 상승하며, 실패 시 무기는 파괴되어 사라집니다.</p>
+            <p><b>2. 속성 부여 (1강)</b><br>Lv 0에서 첫 강화를 성공하는 순간, 무기에 5대 속성 중 하나가 깃듭니다. 부여된 속성은 도감 수집 시에도 동일하게 적용됩니다.</p>
+            <p><b>3. 도감 수집</b><br>무기를 판매하여 금전을 얻을 수도 있지만, 도감에 수집하여 업적을 남길 수 있습니다. 수집된 무기는 소멸하지만 영구적으로 기록됩니다.</p>
+            <p><b>4. 긴급 지원</b><br>자금이 모두 바닥나 더 이상 제련을 할 수 없게 된다면, 대장장이 협회에서 보내는 지원금을 수령하십시오.</p>
         </div>
-        <button onclick="toggleOverlay('how-to-play', false)" class="mt-10 py-3 px-12 bg-white text-black font-black rounded-full text-xs">확인</button>
+        <button onclick="toggleOverlay('how-to-play', false)" class="mt-8 py-5 bg-yellow-800 text-black font-black rounded text-sm font-serif">확인</button>
     </div>
 
     <!-- 설정 -->
     <div id="options" class="overlay justify-center px-10">
-        <h2 class="text-xl font-black text-white mb-10 text-center uppercase tracking-widest">Options</h2>
+        <h2 class="text-2xl font-black text-white mb-12 text-center uppercase tracking-[0.3em] font-serif">Settings</h2>
+        
         <div class="mb-10">
-            <div class="flex justify-between text-[10px] text-zinc-500 mb-2 font-bold uppercase">Volume <span id="v-val">80</span></div>
-            <input type="range" min="0" max="100" value="80" class="w-full h-1 bg-zinc-900 rounded-full appearance-none accent-yellow-700" oninput="document.getElementById('v-val').textContent=this.value">
+            <div class="flex justify-between text-[11px] text-zinc-600 mb-4 font-bold uppercase tracking-widest">Master Volume <span id="v-val">80</span></div>
+            <input type="range" min="0" max="100" value="80" class="w-full" oninput="updateSettings('volume', this.value)">
         </div>
-        <button onclick="toggleOverlay('options', false)" class="py-4 bg-white text-black font-black rounded-lg text-xs">DONE</button>
+
+        <div class="mb-14">
+            <div class="flex justify-between text-[11px] text-zinc-600 mb-5 font-bold uppercase tracking-widest">Graphics Quality</div>
+            <div class="grid grid-cols-2 gap-3">
+                <button id="q-low" onclick="updateSettings('quality', 'LOW')" class="py-4 border border-zinc-900 text-zinc-700 font-bold text-xs rounded-sm">LOW</button>
+                <button id="q-high" onclick="updateSettings('quality', 'HIGH')" class="py-4 border border-yellow-800 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10">HIGH</button>
+            </div>
+        </div>
+
+        <button onclick="toggleOverlay('options', false)" class="py-5 bg-zinc-950 text-zinc-700 font-bold rounded text-[10px] uppercase">Done</button>
     </div>
 
     <div id="notification">
-        <h3 id="noti-t" class="text-lg font-black italic mb-1">SUCCESS</h3>
-        <p id="noti-d" class="text-[9px] text-zinc-500 font-bold">제련에 성공했습니다.</p>
+        <h3 id="noti-t" class="text-xl font-black italic mb-2 font-serif">SUCCESS</h3>
+        <p id="noti-d" class="text-[11px] text-zinc-600 font-bold">제련에 성공하였습니다.</p>
     </div>
 
-    <!-- 회생 모달 -->
-    <div id="bailout-modal" class="absolute inset-0 bg-black/95 z-[3000] hidden flex-col justify-center items-center p-10 text-center">
-        <div class="border-2 border-yellow-900/30 p-8 rounded bg-zinc-950">
-            <h2 class="text-xl font-black text-yellow-700 mb-4 tracking-tighter">긴급 지원</h2>
-            <p class="text-zinc-500 mb-8 text-[9px] leading-relaxed">모든 자금을 잃으셨군요. 지원금을 보내드립니다.</p>
-            <p class="text-3xl font-black text-white mb-10 italic">+5,000 KRW</p>
-            <button onclick="receiveBailout()" class="w-full py-4 bg-yellow-700 text-black font-black rounded text-xs active:scale-95">지원금 받기</button>
+    <div id="bailout-modal" class="absolute inset-0 bg-black/95 z-[3000] hidden flex-col justify-center items-center p-12 text-center">
+        <div class="border-2 border-yellow-900/30 p-10 rounded bg-zinc-950 shadow-2xl">
+            <h2 class="text-2xl font-black text-yellow-800 mb-4 font-serif">재기 지원</h2>
+            <p class="text-zinc-700 mb-10 text-[10px] leading-relaxed">자금을 모두 잃으셨군요. 지원금을 보내드립니다.</p>
+            <p class="text-4xl font-black text-white mb-12 italic font-serif">+5,000 G</p>
+            <button onclick="receiveBailout()" class="w-full py-5 bg-yellow-800 text-black font-black rounded text-xs">수령하기</button>
         </div>
     </div>
 </div>
@@ -409,7 +482,8 @@
         attr: '일반',
         collection: [],
         tab: '일반',
-        busy: false
+        busy: false,
+        settings: { volume: 80, quality: 'HIGH' }
     };
 
     const swordImg = document.getElementById('sword-img');
@@ -431,9 +505,8 @@
     async function initLoading() {
         let p = 0;
         const bar = document.getElementById('loading-bar');
-        const interval = setInterval(() => { p += 5; if(p > 95) p = 95; bar.style.width = p + '%'; }, 100);
+        const interval = setInterval(() => { p += 10; if(p > 95) p = 95; bar.style.width = p + '%'; }, 100);
 
-        // 3초 후 강제 진입 안전 장치
         const forceEntry = setTimeout(() => { proceedToMain(); }, 3500);
 
         const check = setInterval(async () => {
@@ -450,7 +523,7 @@
         function proceedToMain() {
             clearInterval(check); clearInterval(interval);
             bar.style.width = '100%';
-            setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; document.getElementById('main-menu').classList.add('active'); }, 500);
+            setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; document.getElementById('main-menu').classList.add('active'); }, 600);
         }
     }
 
@@ -473,18 +546,26 @@
             const snap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'v1'));
             if (snap.exists()) {
                 const d = snap.data();
-                state.money = d.money; state.lv = d.lv; state.spent = d.spent; state.attr = d.attr; state.collection = d.col || [];
+                state.money = d.money || config.initialMoney; state.lv = d.lv || 0; state.spent = d.spent || 0; state.attr = d.attr || '일반'; state.collection = d.col || [];
             }
         } catch (e) {}
     }
 
-    function startGame() { document.getElementById('main-menu').classList.remove('active'); document.getElementById('game-screen').classList.add('active'); updateUI(); }
+    function startGame() { 
+        document.getElementById('main-menu').classList.remove('active'); 
+        document.getElementById('game-screen').classList.add('active'); 
+        updateUI(); 
+    }
 
-    function exitToMain() { saveData(); document.getElementById('game-screen').classList.remove('active'); document.getElementById('main-menu').classList.add('active'); }
+    function exitToMain() { 
+        saveData(); 
+        document.getElementById('game-screen').classList.remove('active'); 
+        document.getElementById('main-menu').classList.add('active'); 
+    }
 
     function updateUI() {
         moneyDisp.textContent = state.money.toLocaleString() + ' KRW';
-        lvDisp.textContent = 'LV. ' + state.lv;
+        lvDisp.textContent = 'Status: Lv. ' + state.lv;
         swordImg.src = getPath(state.lv, state.attr);
 
         const data = state.lv < 10 ? config.levels[state.lv] : config.levels[9];
@@ -493,8 +574,8 @@
         
         if (state.lv < 10) {
             chanceDisp.textContent = data.chance + '%';
-            costDisp.textContent = data.cost.toLocaleString() + ' KRW';
-            costDisp.style.color = state.money >= data.cost ? '#15803d' : '#b91c1c';
+            costDisp.textContent = data.cost.toLocaleString() + ' G';
+            costDisp.style.color = state.money >= data.cost ? '#2d8a4e' : '#a33131';
         } else {
             chanceDisp.textContent = 'MAX'; costDisp.textContent = '---';
         }
@@ -508,7 +589,7 @@
         }
 
         const sv = calculateSellValue();
-        sellHint.textContent = `판매 예상가: ${sv.toLocaleString()} KRW`;
+        sellHint.textContent = `Value: ${sv.toLocaleString()} Gold`;
         
         const key = `${state.attr}_${state.lv}`;
         const cb = document.getElementById('btn-collect');
@@ -526,18 +607,18 @@
     function enhanceSword() {
         if (state.busy || state.lv >= 10) return;
         const d = config.levels[state.lv];
-        if (state.money < d.cost) { showNoti('FAIL', '자금이 부족합니다.', '#b91c1c'); return; }
+        if (state.money < d.cost) { showNoti('FAIL', '자금이 부족합니다.', '#a33131'); return; }
 
         state.busy = true; state.money -= d.cost; state.spent += d.cost; updateUI();
-        swordImg.style.transform = 'scale(1.1) rotate(2deg)'; swordImg.style.filter = 'brightness(2.5)';
+        swordImg.style.transform = 'scale(1.15) rotate(3deg)'; swordImg.style.filter = 'brightness(3)';
 
         setTimeout(async () => {
             if (Math.random() * 100 < d.chance) {
                 if (state.lv === 0) state.attr = config.attrs[Math.floor(Math.random() * config.attrs.length)];
-                state.lv++; showNoti('SUCCESS', '제련에 성공했습니다.', '#15803d');
+                state.lv++; showNoti('SUCCESS', '제련에 성공했습니다.', '#2d8a4e');
             } else {
                 state.lv = 0; state.spent = 0; state.attr = '일반';
-                showNoti('FAILED', '무기가 파괴되었습니다.', '#b91c1c');
+                showNoti('FAILED', '무기가 파괴되었습니다.', '#a33131');
             }
             state.busy = false; swordImg.style.transform = 'scale(1)'; swordImg.style.filter = '';
             updateUI(); saveData();
@@ -547,7 +628,7 @@
     function sellSword() {
         if (state.lv === 0) return;
         const v = calculateSellValue();
-        state.money += v; showNoti('SOLD', `${v.toLocaleString()} KRW 획득.`, '#15803d');
+        state.money += v; showNoti('SOLD', `${v.toLocaleString()} KRW 획득.`, '#2d8a4e');
         reset();
     }
 
@@ -555,21 +636,33 @@
         const key = `${state.attr}_${state.lv}`;
         if (state.collection.includes(key)) return;
         state.collection.push(key);
-        showNoti('COLLECTED', '도감에 수집되었습니다.', '#15803d');
+        showNoti('COLLECTED', '도감에 수집되었습니다.', '#2d8a4e');
         reset();
     }
 
     function reset() { state.lv = 0; state.spent = 0; state.attr = '일반'; updateUI(); saveData(); }
 
-    function changeColTab(a) { state.tab = a; document.querySelectorAll('.c-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === a)); renderCol(); }
+    function changeColTab(a) { 
+        state.tab = a; 
+        document.querySelectorAll('.c-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === a)); 
+        renderCol(); 
+    }
 
     function renderCol() {
         const grid = document.getElementById('col-list'); grid.innerHTML = '';
-        let cCount = 0; let tCount = state.tab === '일반' ? 1 : 10;
+        let cCount = 0; 
+        let tCount = state.tab === '일반' ? 1 : 10;
         
         if (state.tab === '일반') {
             const has = state.collection.includes('일반_0'); if(has) cCount++;
             grid.appendChild(createSlot('기본검', 0, '일반', !has));
+            
+            // 일반 탭에서 그리드 형식을 유지하기 위해 빈 슬롯 8개 추가
+            for(let i=0; i<8; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'slot border-dashed border-zinc-900 opacity-10';
+                grid.appendChild(empty);
+            }
         } else {
             for (let i = 1; i <= 10; i++) {
                 const has = state.collection.includes(`${state.tab}_${i}`); if(has) cCount++;
@@ -591,6 +684,18 @@
     function toggleOverlay(id, show) { if(id === 'collection-overlay' && show) renderCol(); document.getElementById(id).classList.toggle('active', show); }
 
     function receiveBailout() { state.money += config.bailoutAmount; document.getElementById('bailout-modal').style.display = 'none'; updateUI(); saveData(); }
+
+    function updateSettings(key, val) {
+        state.settings[key] = val;
+        if (key === 'volume') {
+            document.getElementById('v-val').textContent = val;
+        } else if (key === 'quality') {
+            const isHigh = val === 'HIGH';
+            document.getElementById('q-low').className = isHigh ? 'py-4 border border-zinc-800 text-zinc-700 font-bold text-xs rounded-sm' : 'py-4 border border-yellow-700 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10';
+            document.getElementById('q-high').className = isHigh ? 'py-4 border border-yellow-700 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10' : 'py-4 border border-zinc-800 text-zinc-700 font-bold text-xs rounded-sm';
+            document.getElementById('magic-circle').style.animation = isHigh ? 'rotate 60s linear infinite' : 'none';
+        }
+    }
 
     function showNoti(t, d, c) {
         const n = document.getElementById('notification');
