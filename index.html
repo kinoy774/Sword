@@ -8,10 +8,10 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        window.gameDB = { initialized: false, error: null };
+        window.gameDB = { initialized: false, error: null, offline: false };
         
         async function initFirebase() {
             try {
@@ -23,7 +23,14 @@
                 const db = getFirestore(app);
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-                window.gameDB = { db, auth, appId, doc, getDoc, setDoc, collection, initialized: true };
+                // 인증 처리: 토큰이 있으면 커스텀 토큰으로, 없으면 익명 로그인
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                window.gameDB = { db, auth, appId, doc, getDoc, setDoc, collection, initialized: true, offline: false };
             } catch (e) {
                 console.warn("Firebase fallback mode:", e.message);
                 window.gameDB.error = e.message;
@@ -86,10 +93,8 @@
 
         .screen.active { display: flex; }
 
-        /* 로딩 화면 */
         #loading-screen { background: #000; z-index: 1000; justify-content: center; align-items: center; }
 
-        /* 메인 메뉴 */
         #main-menu { background: rgba(0,0,0,0.9); justify-content: center; align-items: center; text-align: center; }
 
         .menu-btn {
@@ -237,11 +242,11 @@
 
         .overlay.active { display: flex; }
 
-        /* 도감 UI */
         .collection-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 12px;
+            row-gap: 24px; /* 수직 간격 충분히 확보 */
             padding: 10px 0;
             overflow-y: auto;
         }
@@ -257,11 +262,10 @@
             align-items: center;
             position: relative;
             box-shadow: inset 0 0 10px #000;
-            overflow: hidden; /* 슬롯 밖으로 나가는 이미지 차단 */
+            overflow: hidden;
         }
         .slot.collected { border-color: var(--dark-gold); background: #151210; }
         
-        /* 도감 내 이미지 크기 최적화 - 모든 아이템 동일 크기 강제 */
         .slot img { 
             max-width: 75%; 
             max-height: 75%; 
@@ -273,7 +277,7 @@
         
         .slot.locked img { display: none; }
         .slot.locked::after { content: '?'; font-size: 2.2rem; font-weight: 900; color: #151515; position: absolute; }
-        .slot-name { position: absolute; bottom: 0; width: 100%; font-size: 7px; text-align: center; background: rgba(0,0,0,0.8); padding: 3px 0; color: #444; font-weight: 900; z-index: 10; }
+        .slot-name { position: absolute; bottom: 0; width: 100%; font-size: 7px; text-align: center; background: rgba(0,0,0,0.85); padding: 4px 0; color: #444; font-weight: 900; z-index: 10; }
         .slot.collected .slot-name { color: var(--gold); }
 
         .prog-bar { width: 100%; height: 8px; background: #000; border: 1px solid #222; margin: 15px 0; border-radius: 4px; overflow: hidden; flex-shrink: 0; }
@@ -333,7 +337,7 @@
         <button onclick="toggleOverlay('collection-overlay', true)" class="menu-btn">수집한 유산 (도감)</button>
         <button onclick="toggleOverlay('how-to-play', true)" class="menu-btn">제련의 비기 (가이드)</button>
         <button onclick="toggleOverlay('options', true)" class="menu-btn">장인 설정 (옵션)</button>
-        <p class="mt-12 text-[9px] text-zinc-800 font-black uppercase tracking-widest">Version 2.6.0 | Fixed UI Edition</p>
+        <p class="mt-12 text-[9px] text-zinc-800 font-black uppercase tracking-widest">Version 2.7.1 | Persistence Edition</p>
     </div>
 
     <!-- 인게임 화면 -->
@@ -388,7 +392,7 @@
             <h2 class="text-2xl font-black text-yellow-800 italic font-serif">무기 도감</h2>
             <p id="rate-text" class="text-sm font-black text-zinc-700">0%</p>
         </div>
-        <div class="prog-bar"><div id="prog-fill" class="prog-fill"></div></div>
+        <div class="prog-bar"><div id="col-prog-fill" class="prog-fill"></div></div>
         
         <div class="tabs">
             <button onclick="changeColTab('일반')" class="tab-btn active c-tab" data-tab="일반">Normal</button>
@@ -412,7 +416,7 @@
             <p><b>1. 강화의 기초</b><br>보유한 금전을 소모하여 검을 강화하십시오. 성공 시 검의 등급과 가치가 상승하며, 실패 시 무기는 파괴되어 사라집니다.</p>
             <p><b>2. 속성 부여 (1강)</b><br>Lv 0에서 첫 강화를 성공하는 순간, 무기에 5대 속성 중 하나가 깃듭니다. 부여된 속성은 도감 수집 시에도 동일하게 적용됩니다.</p>
             <p><b>3. 도감 수집</b><br>무기를 판매하여 금전을 얻을 수도 있지만, 도감에 수집하여 업적을 남길 수 있습니다. 수집된 무기는 소멸하지만 영구적으로 기록됩니다.</p>
-            <p><b>4. 긴급 지원</b><br>자금이 모두 바닥나 더 이상 제련을 할 수 없게 된다면, 대장장이 협회에서 보내는 지원금을 수령하십시오.</p>
+            <p><b>4. 긴급 지원</b><br>자금이 모두 바닥나 더 이상 제련을 할 수 없게 된다면, 협회에서 보내는 지원금을 수령하십시오.</p>
         </div>
         <button onclick="toggleOverlay('how-to-play', false)" class="mt-8 py-5 bg-yellow-800 text-black font-black rounded text-sm font-serif">확인</button>
     </div>
@@ -507,14 +511,14 @@
         const bar = document.getElementById('loading-bar');
         const interval = setInterval(() => { p += 10; if(p > 95) p = 95; bar.style.width = p + '%'; }, 100);
 
-        const forceEntry = setTimeout(() => { proceedToMain(); }, 3500);
+        // Firebase 연동 실패 대비 강제 진입 제한
+        const forceEntry = setTimeout(() => { proceedToMain(); }, 6000);
 
         const check = setInterval(async () => {
             if (window.gameDB && window.gameDB.initialized) {
                 clearTimeout(forceEntry);
-                if (!window.gameDB.offline) {
-                    const user = window.gameDB.auth.currentUser;
-                    if (user) await loadData(user);
+                if (!window.gameDB.offline && window.gameDB.auth.currentUser) {
+                    await loadData(window.gameDB.auth.currentUser);
                 }
                 proceedToMain();
             }
@@ -531,24 +535,35 @@
         if (!window.gameDB || !window.gameDB.initialized || window.gameDB.offline) return;
         const { db, appId, doc, setDoc, auth } = window.gameDB;
         if (!auth.currentUser) return;
+        
         saveInd.style.display = 'block';
         try {
             await setDoc(doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'data', 'v1'), {
                 money: state.money, lv: state.lv, spent: state.spent, attr: state.attr, col: state.collection
             });
             setTimeout(() => saveInd.style.display = 'none', 1000);
-        } catch (e) { saveInd.textContent = 'FAIL'; }
+        } catch (e) { 
+            console.error("Save Error:", e);
+            saveInd.textContent = 'FAIL'; 
+        }
     }
 
     async function loadData(user) {
+        if (!window.gameDB || !window.gameDB.initialized || window.gameDB.offline) return;
         const { db, appId, doc, getDoc } = window.gameDB;
         try {
             const snap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'v1'));
             if (snap.exists()) {
                 const d = snap.data();
-                state.money = d.money || config.initialMoney; state.lv = d.lv || 0; state.spent = d.spent || 0; state.attr = d.attr || '일반'; state.collection = d.col || [];
+                state.money = d.money ?? config.initialMoney; 
+                state.lv = d.lv ?? 0; 
+                state.spent = d.spent ?? 0; 
+                state.attr = d.attr ?? '일반'; 
+                state.collection = d.col ?? [];
             }
-        } catch (e) {}
+        } catch (e) {
+            console.error("Load Error:", e);
+        }
     }
 
     function startGame() { 
@@ -621,7 +636,8 @@
                 showNoti('FAILED', '무기가 파괴되었습니다.', '#a33131');
             }
             state.busy = false; swordImg.style.transform = 'scale(1)'; swordImg.style.filter = '';
-            updateUI(); saveData();
+            updateUI(); 
+            saveData(); // 액션 후 즉시 저장
         }, 600);
     }
 
@@ -649,7 +665,10 @@
     }
 
     function renderCol() {
-        const grid = document.getElementById('col-list'); grid.innerHTML = '';
+        const grid = document.getElementById('col-list');
+        if (!grid) return;
+        grid.innerHTML = '';
+        
         let cCount = 0; 
         let tCount = state.tab === '일반' ? 1 : 10;
         
@@ -657,7 +676,6 @@
             const has = state.collection.includes('일반_0'); if(has) cCount++;
             grid.appendChild(createSlot('기본검', 0, '일반', !has));
             
-            // 일반 탭에서 그리드 형식을 유지하기 위해 빈 슬롯 8개 추가
             for(let i=0; i<8; i++) {
                 const empty = document.createElement('div');
                 empty.className = 'slot border-dashed border-zinc-900 opacity-10';
@@ -669,9 +687,13 @@
                 grid.appendChild(createSlot(`${state.tab}검`, i, state.tab, !has));
             }
         }
+        
+        const rateText = document.getElementById('rate-text');
+        const progFill = document.getElementById('col-prog-fill');
+        
         const rate = Math.floor((cCount / tCount) * 100);
-        document.getElementById('rate-text').textContent = rate + '%';
-        document.getElementById('prog-fill').style.width = rate + '%';
+        if (rateText) rateText.textContent = rate + '%';
+        if (progFill) progFill.style.width = rate + '%';
     }
 
     function createSlot(name, lv, attr, locked) {
@@ -681,7 +703,11 @@
         return div;
     }
 
-    function toggleOverlay(id, show) { if(id === 'collection-overlay' && show) renderCol(); document.getElementById(id).classList.toggle('active', show); }
+    function toggleOverlay(id, show) { 
+        if(id === 'collection-overlay' && show) renderCol(); 
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('active', show);
+    }
 
     function receiveBailout() { state.money += config.bailoutAmount; document.getElementById('bailout-modal').style.display = 'none'; updateUI(); saveData(); }
 
@@ -691,17 +717,25 @@
             document.getElementById('v-val').textContent = val;
         } else if (key === 'quality') {
             const isHigh = val === 'HIGH';
-            document.getElementById('q-low').className = isHigh ? 'py-4 border border-zinc-800 text-zinc-700 font-bold text-xs rounded-sm' : 'py-4 border border-yellow-700 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10';
-            document.getElementById('q-high').className = isHigh ? 'py-4 border border-yellow-700 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10' : 'py-4 border border-zinc-800 text-zinc-700 font-bold text-xs rounded-sm';
-            document.getElementById('magic-circle').style.animation = isHigh ? 'rotate 60s linear infinite' : 'none';
+            const qLow = document.getElementById('q-low');
+            const qHigh = document.getElementById('q-high');
+            if (qLow) qLow.className = isHigh ? 'py-4 border border-zinc-900 text-zinc-700 font-bold text-xs rounded-sm' : 'py-4 border border-yellow-700 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10';
+            if (qHigh) qHigh.className = isHigh ? 'py-4 border border-yellow-700 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10' : 'py-4 border border-zinc-800 text-zinc-700 font-bold text-xs rounded-sm';
+            const magicCircle = document.getElementById('magic-circle');
+            if (magicCircle) magicCircle.style.animation = isHigh ? 'rotate 60s linear infinite' : 'none';
         }
     }
 
     function showNoti(t, d, c) {
         const n = document.getElementById('notification');
-        document.getElementById('noti-t').textContent = t; document.getElementById('noti-t').style.color = c;
-        document.getElementById('noti-d').textContent = d;
-        n.classList.add('active'); setTimeout(() => n.classList.remove('active'), 1500);
+        const nt = document.getElementById('noti-t');
+        const nd = document.getElementById('noti-d');
+        if (nt) { nt.textContent = t; nt.style.color = c; }
+        if (nd) nd.textContent = d;
+        if (n) {
+            n.classList.add('active'); 
+            setTimeout(() => n.classList.remove('active'), 1500);
+        }
     }
 
     window.onload = initLoading;
