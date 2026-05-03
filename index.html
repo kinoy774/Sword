@@ -12,7 +12,7 @@
             --bg-color: #0f0f0f;
             --accent-red: #ff3e3e;
             --accent-gold: #ffd700;
-            --panel-bg: rgba(25, 25, 25, 0.95);
+            --panel-bg: rgba(15, 15, 15, 0.98);
         }
 
         body {
@@ -28,7 +28,6 @@
             height: 100vh;
             -webkit-user-select: none;
             user-select: none;
-            touch-action: manipulation;
         }
 
         #game-container {
@@ -38,12 +37,13 @@
             max-height: 800px;
             aspect-ratio: 9 / 16;
             position: relative;
-            background: radial-gradient(circle at center, #2c1a1a 0%, #0f0f0f 100%);
-            border: 1px solid #333;
+            background: radial-gradient(circle at center, #2c1a1a 0%, #050505 100%);
+            border: 1px solid #222;
             overflow: hidden;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            box-shadow: 0 0 60px rgba(0,0,0,1);
         }
 
+        /* 로딩 화면 */
         #loading-screen {
             position: absolute;
             inset: 0;
@@ -53,29 +53,13 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            transition: opacity 0.5s ease-out;
         }
 
-        .loading-bar-bg {
-            width: 70%;
-            height: 4px;
-            background: #222;
-            margin-top: 20px;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .loading-bar-fill {
-            width: 0%;
-            height: 100%;
-            background: var(--accent-red);
-            box-shadow: 0 0 10px var(--accent-red);
-        }
-
+        /* 메인 메뉴 */
         #main-menu {
             position: absolute;
             inset: 0;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.95);
             z-index: 500;
             display: flex;
             flex-direction: column;
@@ -85,16 +69,17 @@
         }
 
         .status-header {
-            padding: 20px;
+            padding: 25px 20px;
             display: flex;
             justify-content: space-between;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+            background: linear-gradient(to bottom, rgba(0,0,0,1), transparent);
             z-index: 10;
         }
 
+        /* 검 전시 구역 */
         .sword-display {
             position: relative;
-            height: 55%;
+            height: 48%;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -103,11 +88,20 @@
 
         .magic-circle {
             position: absolute;
-            width: 320px;
-            height: 320px;
-            border: 1px solid rgba(255, 62, 62, 0.15);
+            width: 360px;
+            height: 360px;
+            border: 1px solid rgba(255, 62, 62, 0.08);
             border-radius: 50%;
-            animation: rotate 25s linear infinite;
+            animation: rotate 40s linear infinite;
+        }
+
+        .magic-circle-inner {
+            position: absolute;
+            width: 220px;
+            height: 220px;
+            background: radial-gradient(circle, rgba(255, 62, 62, 0.12) 0%, transparent 75%);
+            border-radius: 50%;
+            z-index: 5;
         }
 
         @keyframes rotate {
@@ -116,21 +110,51 @@
         }
 
         .sword-image {
-            width: 280px;
-            height: 280px;
+            width: 320px;
+            height: 320px;
             object-fit: contain;
             z-index: 20;
-            filter: drop-shadow(0 0 15px rgba(0, 0, 0, 0.8));
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            filter: drop-shadow(0 0 20px rgba(0, 0, 0, 1));
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
+        /* RPG 정보창 */
+        .stats-panel {
+            padding: 18px 25px;
+            background: rgba(10, 10, 10, 0.6);
+            border-top: 1px solid rgba(255,255,255,0.03);
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            margin: 5px 0;
+            font-size: 0.9rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            color: #999;
+        }
+
+        .stat-value {
+            color: #eee;
+            font-weight: 800;
+        }
+
+        .stat-up {
+            color: #22c55e;
+            font-size: 0.75rem;
+            margin-left: 6px;
+            font-weight: 400;
+        }
+
+        /* 조작 패널 */
         .action-panel {
             position: absolute;
             bottom: 0;
             width: 100%;
-            padding: 25px 20px 40px 20px;
+            padding: 20px 20px 45px 20px;
             background: var(--panel-bg);
-            border-top: 1px solid #444;
+            border-top: 1px solid #222;
             border-radius: 35px 35px 0 0;
             z-index: 30;
         }
@@ -138,136 +162,147 @@
         .btn {
             width: 100%;
             padding: 18px;
-            border-radius: 15px;
+            border-radius: 14px;
             font-weight: 900;
-            font-size: 1.2rem;
+            font-size: 1.15rem;
             margin-bottom: 12px;
             transition: all 0.1s;
             display: flex;
             justify-content: center;
             align-items: center;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
         }
 
         .btn-enhance {
-            background: linear-gradient(135deg, #8b0000 0%, #ff3e3e 100%);
-            border: 1px solid rgba(255,255,255,0.2);
+            background: linear-gradient(135deg, #7f1d1d 0%, #ef4444 100%);
+            box-shadow: 0 6px 25px rgba(239, 68, 68, 0.25);
+            border: 1px solid rgba(255,255,255,0.1);
         }
 
+        .btn-enhance:active { transform: scale(0.96); filter: brightness(1.3); }
+
         .btn-sell {
-            background: #2a2a2a;
-            border: 1px solid #444;
+            background: #1f1f1f;
+            border: 1px solid #333;
+            color: #999;
+            font-size: 1rem;
         }
 
         #notification {
             position: absolute;
-            top: 35%;
+            top: 38%;
             left: 50%;
             transform: translate(-50%, -50%) scale(0.8);
-            background: rgba(15, 15, 15, 0.95);
-            padding: 25px 50px;
-            border-radius: 15px;
-            border: 2px solid var(--accent-red);
+            background: rgba(5, 5, 5, 0.98);
+            padding: 25px 45px;
+            border-radius: 12px;
+            border: 1px solid var(--accent-red);
             z-index: 2000;
             opacity: 0;
             pointer-events: none;
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             text-align: center;
+            box-shadow: 0 15px 50px rgba(0,0,0,1);
         }
 
-        #notification.active {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1);
-        }
-
-        #bailout-modal {
-            position: absolute;
-            inset: 0;
-            background: rgba(0,0,0,0.92);
-            z-index: 3000;
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 40px;
-        }
-
-        .bailout-content {
-            background: #1a1a1a;
-            padding: 35px 25px;
-            border-radius: 25px;
-            border: 1px solid var(--accent-gold);
-            text-align: center;
-        }
+        #notification.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
     </style>
 </head>
 <body>
 
 <div id="game-container">
+    <!-- 로딩 화면 -->
     <div id="loading-screen">
-        <h1 class="text-3xl font-black italic text-white">THE SMITH</h1>
-        <div class="loading-bar-bg">
-            <div id="loading-bar" class="loading-bar-fill"></div>
+        <h1 class="text-3xl font-black italic text-white tracking-tighter">THE SMITH</h1>
+        <div class="w-52 h-1 bg-zinc-900 mt-5 rounded-full overflow-hidden">
+            <div id="loading-bar" class="h-full bg-red-600 w-0 transition-all"></div>
         </div>
-        <p class="mt-4 text-[10px] text-gray-500 uppercase tracking-widest">Forging Assets...</p>
+        <p class="mt-4 text-[10px] text-zinc-600 font-bold tracking-[0.4em] uppercase">Forging Assets</p>
     </div>
 
+    <!-- 메인 메뉴 -->
     <div id="main-menu">
-        <h1 class="text-5xl font-black mb-10 text-white">검 강화하기</h1>
-        <button onclick="startGame()" class="px-14 py-4 bg-white text-black font-black rounded-full shadow-xl">
+        <h1 class="text-5xl font-black mb-14 text-white italic tracking-tighter">검 강화하기</h1>
+        <button onclick="startGame()" class="px-16 py-4 bg-white text-black font-black rounded-full active:scale-95 transition-transform shadow-2xl">
             시작하기
         </button>
     </div>
 
+    <!-- 헤더 상태창 -->
     <div class="status-header">
-        <div class="flex flex-col">
-            <span class="text-gray-500 text-[10px] font-bold">BALANCE</span>
-            <span id="money-display" class="text-xl font-black text-yellow-500">10,000 KRW</span>
+        <div>
+            <p class="text-[10px] text-zinc-600 font-black tracking-widest">BALANCE</p>
+            <p id="money-display" class="text-xl font-black text-yellow-500">10,000 KRW</p>
         </div>
-        <div class="flex flex-col items-end">
-            <span class="text-gray-500 text-[10px] font-bold">ENCHANT</span>
-            <span id="level-display" class="text-xl font-black text-white">Lv. 0</span>
+        <div class="text-right">
+            <p class="text-[10px] text-zinc-600 font-black tracking-widest">ENCHANT</p>
+            <p id="level-display" class="text-xl font-black italic text-white">Lv. 0</p>
         </div>
     </div>
 
+    <!-- 검 전시 구역 -->
     <div class="sword-display">
         <div class="magic-circle"></div>
-        <img id="sword-img" src="image/기본검.png" alt="Sword" class="sword-image" 
-             onerror="this.src='https://via.placeholder.com/280/222/555?text=Check+Filename'">
-        <div class="sword-info text-center mt-4 z-20">
-            <h2 id="sword-name" class="text-3xl font-black mb-1">기본검</h2>
-            <p id="sword-attr" class="text-xs text-gray-500 uppercase tracking-widest">Normal Type</p>
+        <div class="magic-circle-inner"></div>
+        <img id="sword-img" src="image/기본검.png" alt="Sword" class="sword-image">
+        <div class="text-center z-20 mt-5">
+            <h2 id="sword-name" class="text-3xl font-black drop-shadow-xl text-white">기본검</h2>
+            <p id="sword-attr" class="text-[10px] text-red-500 font-black uppercase tracking-[0.4em] mt-1">Normal Grade</p>
         </div>
     </div>
 
+    <!-- 스탯 정보 -->
+    <div class="stats-panel">
+        <div class="stat-row">
+            <span>무기 공격력</span>
+            <span><span id="stat-atk" class="stat-value">10</span> <span id="atk-up" class="stat-up"></span></span>
+        </div>
+        <div class="stat-row">
+            <span>기본 명중률</span>
+            <span><span id="stat-acc" class="stat-value">85</span>% <span id="acc-up" class="stat-up"></span></span>
+        </div>
+        <div class="stat-row">
+            <span>부여 속성</span>
+            <span id="stat-opt" class="stat-value text-zinc-700">없음</span>
+        </div>
+    </div>
+
+    <!-- 조작 창 -->
     <div class="action-panel">
         <div class="flex justify-between mb-5 px-1">
-            <div class="flex flex-col">
-                <span class="text-[10px] text-gray-500 font-bold">SUCCESS RATE</span>
-                <span id="chance-display" class="text-base font-black text-green-500">100%</span>
+            <div>
+                <p class="text-[9px] text-zinc-500 font-black">CHANCE</p>
+                <p id="chance-display" class="text-base font-black text-green-500">100%</p>
             </div>
-            <div class="flex flex-col items-end">
-                <span class="text-[10px] text-gray-500 font-bold">COST</span>
-                <span id="cost-display" class="text-base font-black text-red-500">1,000 KRW</span>
+            <div class="text-right">
+                <p class="text-[9px] text-zinc-500 font-black">ENHANCE COST</p>
+                <p id="cost-display" class="text-base font-black text-red-500">1,000 KRW</p>
             </div>
         </div>
 
         <button id="btn-enhance" onclick="enhanceSword()" class="btn btn-enhance">강화하기</button>
         <button id="btn-sell" onclick="sellSword()" class="btn btn-sell">
-            <span id="sell-value-display">판매하기 (0 KRW)</span>
+            <span id="sell-value-display">판매 (0 KRW)</span>
         </button>
     </div>
 
+    <!-- 알림 팝업 -->
     <div id="notification">
-        <h3 id="noti-title" class="text-2xl font-black mb-1">SUCCESS</h3>
-        <p id="noti-desc" class="text-sm text-gray-400">강화에 성공했습니다!</p>
+        <h3 id="noti-title" class="text-2xl font-black mb-1 italic">SUCCESS</h3>
+        <p id="noti-desc" class="text-sm text-zinc-500">장비가 강화되었습니다.</p>
     </div>
 
-    <div id="bailout-modal">
-        <div class="bailout-content">
-            <h2 class="text-2xl font-black mb-3 text-yellow-500">자금 지원</h2>
-            <p class="text-gray-400 mb-8 text-sm">돈이 없으시군요 제가 도와드리죠!</p>
-            <div class="text-3xl font-black mb-10 text-white">+5,000 KRW</div>
-            <button onclick="receiveBailout()" class="w-full py-4 bg-yellow-500 text-black font-black rounded-xl">지원금 받기</button>
+    <!-- 회생지원금 모달 -->
+    <div id="bailout-modal" class="absolute inset-0 bg-black/95 z-[3000] hidden flex-col justify-center items-center p-10 text-center">
+        <div class="border border-yellow-600/20 p-10 rounded-3xl bg-zinc-950 shadow-2xl">
+            <div class="w-14 h-14 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span class="text-2xl">💸</span>
+            </div>
+            <h2 class="text-2xl font-black text-yellow-500 mb-4">자금 지원</h2>
+            <p class="text-zinc-500 mb-8 text-sm leading-relaxed">돈이 없으시군요 제가 도와드리죠!<br>재기를 응원합니다.</p>
+            <p class="text-4xl font-black text-white mb-12 italic">+5,000 KRW</p>
+            <button onclick="receiveBailout()" class="w-full py-4 bg-yellow-500 text-black font-black rounded-xl active:scale-95 transition-transform">지원금 받기</button>
         </div>
     </div>
 </div>
@@ -277,26 +312,32 @@
         initialMoney: 10000,
         bailoutAmount: 5000,
         levels: [
-            { chance: 100, cost: 1000, sellMult: 1.5 },
-            { chance: 90, cost: 1500, sellMult: 1.8 },
-            { chance: 80, cost: 2500, sellMult: 2.2 },
-            { chance: 70, cost: 4000, sellMult: 2.8 },
-            { chance: 60, cost: 7000, sellMult: 3.5 },
-            { chance: 50, cost: 12000, sellMult: 4.5 },
-            { chance: 40, cost: 20000, sellMult: 6.0 },
-            { chance: 30, cost: 35000, sellMult: 8.5 },
-            { chance: 20, cost: 60000, sellMult: 12.0 },
-            { chance: 10, cost: 100000, sellMult: 20.0 }
+            { chance: 100, cost: 1000, sellMult: 1.5, atk: 10, acc: 85 },
+            { chance: 90, cost: 1500, sellMult: 1.8, atk: 18, acc: 86 },
+            { chance: 80, cost: 2800, sellMult: 2.2, atk: 28, acc: 87 },
+            { chance: 70, cost: 4500, sellMult: 2.8, atk: 42, acc: 88 },
+            { chance: 60, cost: 8000, sellMult: 3.5, atk: 65, acc: 89 },
+            { chance: 50, cost: 14000, sellMult: 4.5, atk: 98, acc: 90 },
+            { chance: 40, cost: 25000, sellMult: 6.0, atk: 145, acc: 91 },
+            { chance: 30, cost: 45000, sellMult: 8.5, atk: 220, acc: 92 },
+            { chance: 20, cost: 80000, sellMult: 12.0, atk: 350, acc: 94 },
+            { chance: 10, cost: 150000, sellMult: 20.0, atk: 580, acc: 96 },
+            { chance: 5, cost: 300000, sellMult: 50.0, atk: 999, acc: 99 }
         ]
     };
 
     let state = {
         money: config.initialMoney,
         currentLevel: 0,
-        attribute: '일반',
         totalSpent: 0,
         isEnhancing: false
     };
+
+    // 이미지 경로 처리 함수: 수정된 파일 이름 반영
+    function getSwordImagePath(lv) {
+        if (lv === 0) return 'image/기본검.png';
+        return `image/화염검${lv}.png`;
+    }
 
     const moneyEl = document.getElementById('money-display');
     const levelEl = document.getElementById('level-display');
@@ -306,26 +347,36 @@
     const chanceEl = document.getElementById('chance-display');
     const costEl = document.getElementById('cost-display');
     const sellDisplayEl = document.getElementById('sell-value-display');
-    const notificationEl = document.getElementById('notification');
-    const bailoutModal = document.getElementById('bailout-modal');
 
-    (function initLoader() {
-        let progress = 0;
+    const statAtk = document.getElementById('stat-atk');
+    const statAcc = document.getElementById('stat-acc');
+    const statOpt = document.getElementById('stat-opt');
+    const atkUp = document.getElementById('atk-up');
+    const accUp = document.getElementById('acc-up');
+
+    // 로딩바 애니메이션
+    (function init() {
+        let p = 0;
         const bar = document.getElementById('loading-bar');
-        const loader = setInterval(() => {
-            progress += 10;
-            if (progress >= 100) {
-                clearInterval(loader);
+        const interval = setInterval(() => {
+            p += Math.floor(Math.random() * 10) + 5;
+            if (p >= 100) {
+                p = 100;
+                clearInterval(interval);
                 setTimeout(() => {
-                    document.getElementById('loading-screen').style.display = 'none';
+                    document.getElementById('loading-screen').style.opacity = '0';
+                    setTimeout(() => document.getElementById('loading-screen').style.display = 'none', 500);
                 }, 300);
             }
-            bar.style.width = progress + '%';
-        }, 100);
+            bar.style.width = p + '%';
+        }, 50);
     })();
 
     function startGame() {
-        document.getElementById('main-menu').style.display = 'none';
+        document.getElementById('main-menu').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('main-menu').style.display = 'none';
+        }, 500);
         updateUI();
     }
 
@@ -333,29 +384,44 @@
         moneyEl.textContent = state.money.toLocaleString() + ' KRW';
         levelEl.textContent = 'Lv. ' + state.currentLevel;
         
-        if (state.currentLevel === 0) {
-            swordImgEl.src = 'image/기본검.png';
-            swordNameEl.textContent = '기본검';
-            swordAttrEl.textContent = 'Normal Type';
-        } else {
-            // 사용자님의 캡처본에 따른 파일명 공백 반영: '화염검 _ 1.png'
-            swordImgEl.src = `image/화염검 _ ${state.currentLevel}.png`;
-            swordNameEl.textContent = `화염검 +${state.currentLevel}`;
-            swordAttrEl.textContent = `Fire Type`;
-        }
+        // 새로운 경로 규칙 적용
+        swordImgEl.src = getSwordImagePath(state.currentLevel);
 
-        if (state.currentLevel < 10) {
-            const data = config.levels[state.currentLevel];
-            chanceEl.textContent = data.chance + '%';
-            costEl.textContent = data.cost.toLocaleString() + ' KRW';
-            costEl.style.color = state.money >= data.cost ? '#4ade80' : '#f87171';
+        const currentData = config.levels[state.currentLevel];
+        const nextData = config.levels[state.currentLevel + 1];
+
+        // 스탯창 정보 갱신
+        statAtk.textContent = currentData.atk;
+        statAcc.textContent = currentData.acc;
+        
+        if (nextData) {
+            atkUp.textContent = `(▲${nextData.atk - currentData.atk})`;
+            accUp.textContent = `(▲${nextData.acc - currentData.acc})`;
+            chanceEl.textContent = currentData.chance + '%';
+            costEl.textContent = currentData.cost.toLocaleString() + ' KRW';
+            costEl.style.color = state.money >= currentData.cost ? '#22c55e' : '#ef4444';
         } else {
+            atkUp.textContent = '';
+            accUp.textContent = '';
             chanceEl.textContent = 'MAX';
             costEl.textContent = '---';
         }
 
-        const sellValue = calculateSellValue();
-        sellDisplayEl.textContent = `판매하기 (${sellValue.toLocaleString()} KRW)`;
+        if (state.currentLevel === 0) {
+            swordNameEl.textContent = '기본검';
+            swordAttrEl.textContent = 'Normal Grade';
+            statOpt.textContent = '없음';
+            statOpt.className = 'stat-value text-zinc-700';
+        } else {
+            swordNameEl.textContent = `화염검 +${state.currentLevel}`;
+            swordAttrEl.textContent = 'Fire Grade';
+            statOpt.textContent = '화염 속성 공격';
+            statOpt.className = 'stat-value text-red-500';
+        }
+
+        const sellVal = calculateSellValue();
+        sellDisplayEl.textContent = `판매 (${sellVal.toLocaleString()} KRW)`;
+        
         checkBailout();
     }
 
@@ -368,8 +434,9 @@
     function enhanceSword() {
         if (state.isEnhancing || state.currentLevel >= 10) return;
         const data = config.levels[state.currentLevel];
+
         if (state.money < data.cost) {
-            showNotification('FAILED', '자금이 부족합니다.', 'fail');
+            showNotification('자금 부족', '강화에 필요한 비용이 부족합니다.', 'fail');
             return;
         }
 
@@ -377,52 +444,63 @@
         state.money -= data.cost;
         state.totalSpent += data.cost;
         updateUI();
-        
-        swordImgEl.style.transform = 'scale(1.2)';
+
+        // 강화 연출
+        swordImgEl.style.transform = 'scale(1.15) rotate(3deg)';
+        swordImgEl.style.filter = 'brightness(2.5) drop-shadow(0 0 30px white)';
+
         setTimeout(() => {
-            if (Math.random() * 100 < data.chance) {
+            const success = Math.random() * 100 < data.chance;
+            if (success) {
                 state.currentLevel++;
-                showNotification('SUCCESS', '제련에 성공했습니다!', 'success');
+                showNotification('SUCCESS', '강화 공정에 성공했습니다!', 'success');
             } else {
                 state.currentLevel = 0;
                 state.totalSpent = 0;
-                showNotification('FAILED', '검이 파괴되었습니다.', 'fail');
+                showNotification('FAILED', '강화 실패로 무기가 파괴되었습니다.', 'fail');
             }
             state.isEnhancing = false;
-            swordImgEl.style.transform = 'scale(1)';
+            swordImgEl.style.transform = 'scale(1) rotate(0deg)';
+            swordImgEl.style.filter = '';
             updateUI();
-        }, 500);
+        }, 700);
     }
 
     function sellSword() {
         if (state.currentLevel === 0) return;
-        const val = calculateSellValue();
-        state.money += val;
-        showNotification('SOLD', `${val.toLocaleString()} KRW 획득!`, 'success');
+        const v = calculateSellValue();
+        state.money += v;
+        showNotification('SOLD', `장비를 판매하여 ${v.toLocaleString()} KRW를 받았습니다.`, 'success');
         state.currentLevel = 0;
         state.totalSpent = 0;
         updateUI();
     }
 
     function checkBailout() {
-        const nextCost = state.currentLevel < 10 ? config.levels[state.currentLevel].cost : Infinity;
-        if (state.money < nextCost && state.currentLevel === 0) {
-            setTimeout(() => bailoutModal.style.display = 'flex', 500);
+        if (state.money < 1000 && state.currentLevel === 0) {
+            setTimeout(() => {
+                document.getElementById('bailout-modal').style.display = 'flex';
+            }, 1000);
         }
     }
 
     function receiveBailout() {
         state.money += config.bailoutAmount;
-        bailoutModal.style.display = 'none';
+        document.getElementById('bailout-modal').style.display = 'none';
         updateUI();
     }
 
     function showNotification(title, desc, type) {
-        notificationEl.querySelector('h3').textContent = title;
-        notificationEl.querySelector('p').textContent = desc;
-        notificationEl.style.borderColor = type === 'success' ? '#4ade80' : '#f87171';
-        notificationEl.classList.add('active');
-        setTimeout(() => notificationEl.classList.remove('active'), 1500);
+        const n = document.getElementById('notification');
+        n.querySelector('h3').textContent = title;
+        n.querySelector('p').textContent = desc;
+        
+        const color = type === 'success' ? '#22c55e' : '#ef4444';
+        n.style.borderColor = color;
+        n.querySelector('h3').style.color = color;
+        
+        n.classList.add('active');
+        setTimeout(() => n.classList.remove('active'), 1800);
     }
 </script>
 </body>
