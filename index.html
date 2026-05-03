@@ -11,6 +11,18 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // 전역 상태 초기화 (Firebase 연동 전 기본값)
+        window.gameState = {
+            money: 10000,
+            lv: 0,
+            spent: 0,
+            attr: '일반',
+            collection: [],
+            tab: '일반',
+            busy: false,
+            settings: { volume: 80, quality: 'HIGH' }
+        };
+
         window.gameDB = { initialized: false, offline: false, userId: null };
         
         async function initFirebase() {
@@ -23,7 +35,7 @@
                 const db = getFirestore(app);
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-                // 인증 처리
+                // RULE 3: Auth Before Queries
                 let userCredential;
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     userCredential = await signInWithCustomToken(auth, __initial_auth_token);
@@ -38,52 +50,61 @@
                     offline: false 
                 };
 
-                // 초기 데이터 로드 시도
+                // 인증 완료 후 데이터 로드
                 await window.loadDataFromCloud();
                 
             } catch (e) {
-                console.warn("Firebase Fallback:", e.message);
+                console.warn("Firebase Fallback Mode:", e.message);
                 window.gameDB.initialized = true; 
                 window.gameDB.offline = true;
             }
         }
         
-        // 전역 로드 함수 정의
+        // 전역 로드 함수
         window.loadDataFromCloud = async function() {
             if (!window.gameDB.initialized || window.gameDB.offline) return;
             const { db, appId, userId, doc, getDoc } = window.gameDB;
             try {
                 // RULE 1: Strict Paths 적용
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'data', 'v1');
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'data', 'savefile');
                 const snap = await getDoc(docRef);
                 if (snap.exists()) {
                     const d = snap.data();
+                    // 불러온 데이터를 전역 상태에 반영
                     window.gameState.money = d.money ?? 10000; 
                     window.gameState.lv = d.lv ?? 0; 
                     window.gameState.spent = d.spent ?? 0; 
                     window.gameState.attr = d.attr ?? '일반'; 
                     window.gameState.collection = d.collection ?? [];
-                    console.log("Data loaded successfully");
+                    console.log("Cloud data loaded");
                 }
             } catch (e) {
                 console.error("Load Error:", e);
             }
         };
 
+        // 전역 저장 함수
         window.saveDataToCloud = async function() {
             if (!window.gameDB.initialized || window.gameDB.offline || !window.gameDB.userId) return;
             const { db, appId, userId, doc, setDoc } = window.gameDB;
+            
+            const saveIndicator = document.getElementById('save-indicator');
+            if (saveIndicator) saveIndicator.style.display = 'block';
+
             try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'data', 'v1');
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'data', 'savefile');
                 await setDoc(docRef, {
                     money: window.gameState.money,
                     lv: window.gameState.lv,
                     spent: window.gameState.spent,
                     attr: window.gameState.attr,
-                    collection: window.gameState.collection
+                    collection: window.gameState.collection,
+                    updatedAt: Date.now()
                 });
+                if (saveIndicator) setTimeout(() => saveIndicator.style.display = 'none', 1000);
             } catch (e) {
                 console.error("Save Error:", e);
+                if (saveIndicator) saveIndicator.textContent = "SAVE FAILED";
             }
         };
 
@@ -295,7 +316,7 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 12px;
-            row-gap: 40px; /* 인벤토리 느낌을 위한 수직 간격 충분히 확보 */
+            row-gap: 50px; /* 슬롯 간 위아래 간격 충분히 확보 */
             padding: 10px 0;
             overflow-y: auto;
             align-content: start;
@@ -334,7 +355,7 @@
             font-size: 7px; 
             text-align: center; 
             background: rgba(0,0,0,0.85); 
-            padding: 8px 0; /* 겹침 방지 */
+            padding: 6px 0; 
             color: #444; 
             font-weight: 900; 
             z-index: 10;
@@ -364,9 +385,6 @@
         }
         #notification.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
-        .guide-text p { margin-bottom: 20px; font-size: 0.95rem; line-height: 1.6; color: #999; }
-        .guide-text b { color: var(--gold); font-size: 1.1rem; }
-
         input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #222; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; border: 1px solid var(--gold); height: 16px; width: 16px; border-radius: 50%; background: #000; margin-top: -6px; cursor: pointer; }
@@ -377,7 +395,7 @@
 <body>
 
 <div id="game-container">
-    <div id="save-indicator" class="absolute top-3 left-1/2 -translate-x-1/2 text-[8px] text-zinc-800 italic hidden z-50 uppercase font-black">Syncing...</div>
+    <div id="save-indicator" class="absolute top-3 left-1/2 -translate-x-1/2 text-[8px] text-zinc-800 italic hidden z-50 uppercase font-black">Cloud Saving...</div>
 
     <!-- 로딩 화면 -->
     <div id="loading-screen" class="screen active">
@@ -385,7 +403,7 @@
         <div class="w-44 h-0.5 bg-zinc-900 mt-8 rounded-full overflow-hidden border border-zinc-900">
             <div id="loading-bar" class="h-full bg-yellow-800 w-0 transition-all duration-300"></div>
         </div>
-        <p class="mt-4 text-[9px] text-zinc-700 font-bold uppercase tracking-[0.4em]">제련소를 정비하는 중...</p>
+        <p class="mt-4 text-[9px] text-zinc-700 font-bold uppercase tracking-[0.4em]">데이터를 불러오는 중...</p>
     </div>
 
     <!-- 메인 메뉴 -->
@@ -398,7 +416,7 @@
         <button onclick="toggleOverlay('collection-overlay', true)" class="menu-btn">수집한 유산 (도감)</button>
         <button onclick="toggleOverlay('how-to-play', true)" class="menu-btn">제련의 비기 (가이드)</button>
         <button onclick="toggleOverlay('options', true)" class="menu-btn">장인 설정 (옵션)</button>
-        <p class="mt-12 text-[9px] text-zinc-800 font-black uppercase tracking-widest">Version 2.7.3 | Cloud Edition</p>
+        <p class="mt-12 text-[9px] text-zinc-800 font-black uppercase tracking-widest">Version 2.8.0 | Cloud persistence</p>
     </div>
 
     <!-- 인게임 화면 -->
@@ -464,20 +482,17 @@
             <button onclick="changeColTab('빛')" class="tab-btn c-tab" data-tab="빛">Light</button>
         </div>
 
-        <div id="col-list" class="flex-1 overflow-y-auto no-scrollbar collection-grid">
-            <!-- JS 동적 생성 -->
-        </div>
+        <div id="col-list" class="flex-1 overflow-y-auto no-scrollbar collection-grid"></div>
         <button onclick="toggleOverlay('collection-overlay', false)" class="mt-6 py-4 bg-zinc-950 text-zinc-700 font-bold rounded text-[10px] uppercase tracking-widest">Back</button>
     </div>
 
-    <!-- 게임 방법 -->
+    <!-- 가이드 -->
     <div id="how-to-play" class="overlay">
         <h2 class="text-2xl font-black text-white mb-10 border-b border-zinc-900 w-full text-center pb-4 font-serif">제련의 비결 (가이드)</h2>
         <div class="guide-text flex-1 overflow-y-auto px-4 no-scrollbar">
-            <p><b>1. 강화의 기초</b><br>보유한 금전을 소모하여 검을 강화하십시오. 성공 시 검의 등급과 가치가 상승하며, 실패 시 무기는 파괴되어 사라집니다.</p>
-            <p><b>2. 속성 부여 (1강)</b><br>Lv 0에서 첫 강화를 성공하는 순간, 무기에 5대 속성 중 하나가 깃듭니다. 부여된 속성은 도감 수집 시에도 동일하게 적용됩니다.</p>
-            <p><b>3. 도감 수집</b><br>무기를 판매하여 금전을 얻을 수도 있지만, 도감에 수집하여 업적을 남길 수 있습니다. 수집된 무기는 소멸하지만 영구적으로 기록됩니다.</p>
-            <p><b>4. 긴급 지원</b><br>자금이 모두 바닥나 더 이상 제련을 할 수 없게 된다면, 협회에서 보내는 지원금을 수령하십시오.</p>
+            <p class="mb-5 text-[15px] leading-relaxed text-[#999]"><b class="text-[#d4af37] text-[17px]">1. 강화의 기초</b><br>보유한 금전을 소모하여 검을 강화하십시오. 성공 시 검의 등급과 가치가 상승하며 , 실패 시 무기는 파괴되어 사라집니다 .</p>
+            <p class="mb-5 text-[15px] leading-relaxed text-[#999]"><b class="text-[#d4af37] text-[17px]">2. 속성 부여 (1강)</b><br>Lv 0에서 첫 강화를 성공하는 순간 , 무기에 5대 속성 중 하나가 깃듭니다 . 부여된 속성은 도감 수집 시에도 동일하게 적용됩니다 .</p>
+            <p class="mb-5 text-[15px] leading-relaxed text-[#999]"><b class="text-[#d4af37] text-[17px]">3. 도감 수집</b><br>무기를 판매하여 금전을 얻을 수도 있지만 , 도감에 수집하여 업적을 남길 수 있습니다 . 수집된 무기는 소멸하지만 영구적으로 기록됩니다 .</p>
         </div>
         <button onclick="toggleOverlay('how-to-play', false)" class="mt-8 py-5 bg-yellow-800 text-black font-black rounded text-sm font-serif">확인</button>
     </div>
@@ -485,32 +500,29 @@
     <!-- 설정 -->
     <div id="options" class="overlay justify-center px-10">
         <h2 class="text-2xl font-black text-white mb-12 text-center uppercase tracking-[0.3em] font-serif">Settings</h2>
-        
         <div class="mb-10">
             <div class="flex justify-between text-[11px] text-zinc-600 mb-4 font-bold uppercase tracking-widest">Master Volume <span id="v-val">80</span></div>
             <input type="range" min="0" max="100" value="80" class="w-full" oninput="updateSettings('volume', this.value)">
         </div>
-
         <div class="mb-14">
             <div class="flex justify-between text-[11px] text-zinc-600 mb-5 font-bold uppercase tracking-widest">Graphics Quality</div>
             <div class="grid grid-cols-2 gap-3">
                 <button id="q-low" onclick="updateSettings('quality', 'LOW')" class="py-4 border border-zinc-900 text-zinc-700 font-bold text-xs rounded-sm">LOW</button>
-                <button id="q-high" onclick="updateSettings('quality', 'HIGH')" class="py-4 border border-yellow-800 text-yellow-700 font-bold text-xs rounded-sm bg-yellow-900/10">HIGH</button>
+                <button id="q-high" onclick="updateSettings('quality', 'HIGH')" class="py-4 border border-yellow-800 text-yellow-800 font-bold text-xs rounded-sm bg-yellow-900/10">HIGH</button>
             </div>
         </div>
-
         <button onclick="toggleOverlay('options', false)" class="py-5 bg-zinc-950 text-zinc-700 font-bold rounded text-[10px] uppercase">Done</button>
     </div>
 
     <div id="notification">
         <h3 id="noti-t" class="text-xl font-black italic mb-2 font-serif">SUCCESS</h3>
-        <p id="noti-d" class="text-[11px] text-zinc-600 font-bold">제련에 성공하였습니다.</p>
+        <p id="noti-d" class="text-[11px] text-zinc-600 font-bold">제련에 성공하였습니다 .</p>
     </div>
 
     <div id="bailout-modal" class="absolute inset-0 bg-black/95 z-[3000] hidden flex-col justify-center items-center p-12 text-center">
         <div class="border-2 border-yellow-900/30 p-10 rounded bg-zinc-950 shadow-2xl">
             <h2 class="text-2xl font-black text-yellow-800 mb-4 font-serif">재기 지원</h2>
-            <p class="text-zinc-700 mb-10 text-[10px] leading-relaxed">자금을 모두 잃으셨군요. 지원금을 보내드립니다.</p>
+            <p class="text-zinc-700 mb-10 text-[10px] leading-relaxed">자금을 모두 잃으셨군요 . 지원금을 보내드립니다 .</p>
             <p class="text-4xl font-black text-white mb-12 italic font-serif">+5,000 G</p>
             <button onclick="receiveBailout()" class="w-full py-5 bg-yellow-800 text-black font-black rounded text-xs">수령하기</button>
         </div>
@@ -518,18 +530,6 @@
 </div>
 
 <script>
-    // 게임 상태 전역 관리 (window 객체에 바인딩하여 모듈과 통신)
-    window.gameState = {
-        money: 10000,
-        lv: 0,
-        spent: 0,
-        attr: '일반',
-        collection: [],
-        tab: '일반',
-        busy: false,
-        settings: { volume: 80, quality: 'HIGH' }
-    };
-
     const config = {
         attrs: ['불', '얼음', '대지', '암흑', '빛'],
         levels: [
@@ -550,16 +550,6 @@
         }
     };
 
-    const swordImg = document.getElementById('sword-img');
-    const moneyDisp = document.getElementById('money-display');
-    const lvDisp = document.getElementById('level-display');
-    const nameDisp = document.getElementById('sword-name');
-    const attrDisp = document.getElementById('sword-attr');
-    const chanceDisp = document.getElementById('chance-display');
-    const costDisp = document.getElementById('cost-display');
-    const sellHint = document.getElementById('sell-hint');
-    const saveInd = document.getElementById('save-indicator');
-
     function getPath(lv, attr) {
         if (lv === 0) return 'image/기본검.png';
         let pre = attr === '불' ? '화염' : attr;
@@ -570,12 +560,11 @@
         let p = 0;
         const bar = document.getElementById('loading-bar');
         const interval = setInterval(() => { 
-            p += 10; 
-            if(p > 95) p = 95; 
+            p += 5; 
+            if(p > 98) p = 98; 
             if(bar) bar.style.width = p + '%'; 
-        }, 100);
+        }, 50);
 
-        // Firebase 로딩을 기다림
         const check = setInterval(async () => {
             if (window.gameDB && window.gameDB.initialized) {
                 clearInterval(check);
@@ -587,7 +576,7 @@
                     updateUI();
                 }, 600);
             }
-        }, 500);
+        }, 200);
     }
 
     function startGame() { 
@@ -603,16 +592,23 @@
     }
 
     function updateUI() {
-        if (!moneyDisp) return;
         const state = window.gameState;
+        const moneyDisp = document.getElementById('money-display');
+        const swordImg = document.getElementById('sword-img');
+        const nameDisp = document.getElementById('sword-name');
+
+        if (!moneyDisp) return;
         moneyDisp.textContent = state.money.toLocaleString() + ' KRW';
-        lvDisp.textContent = 'Status: Lv. ' + state.lv;
+        document.getElementById('level-display').textContent = 'Status: Lv. ' + state.lv;
         swordImg.src = getPath(state.lv, state.attr);
 
         const data = state.lv < 10 ? config.levels[state.lv] : config.levels[9];
         document.getElementById('stat-atk').textContent = data.atk.toLocaleString();
         document.getElementById('stat-acc').textContent = data.acc + '%';
         
+        const chanceDisp = document.getElementById('chance-display');
+        const costDisp = document.getElementById('cost-display');
+
         if (state.lv < 10) {
             chanceDisp.textContent = data.chance + '%';
             costDisp.textContent = data.cost.toLocaleString() + ' G';
@@ -623,16 +619,16 @@
 
         if (state.lv === 0) {
             nameDisp.textContent = '기본검'; 
-            attrDisp.textContent = 'Normal Grade'; 
+            document.getElementById('sword-attr').textContent = 'Normal Grade'; 
             document.getElementById('stat-opt').textContent = '없음';
         } else {
             nameDisp.textContent = `${state.attr}검 +${state.lv}`;
-            attrDisp.textContent = `${state.attr} Grade`;
+            document.getElementById('sword-attr').textContent = `${state.attr} Grade`;
             document.getElementById('stat-opt').textContent = `${state.attr} 속성 강화`;
         }
 
         const sv = calculateSellValue();
-        sellHint.textContent = `Value: ${sv.toLocaleString()} Gold`;
+        document.getElementById('sell-hint').textContent = `Value: ${sv.toLocaleString()} Gold`;
         
         const key = `${state.attr}_${state.lv}`;
         const cb = document.getElementById('btn-collect');
@@ -660,9 +656,10 @@
         const state = window.gameState;
         if (state.busy || state.lv >= 10) return;
         const d = config.levels[state.lv];
-        if (state.money < d.cost) { showNoti('FAIL', '자금이 부족합니다.', '#a33131'); return; }
+        if (state.money < d.cost) { showNoti('FAIL', '자금이 부족합니다 .', '#a33131'); return; }
 
         state.busy = true; state.money -= d.cost; state.spent += d.cost; updateUI();
+        const swordImg = document.getElementById('sword-img');
         swordImg.style.transform = 'scale(1.15) rotate(3deg)'; 
         swordImg.style.filter = 'brightness(3)';
 
@@ -670,10 +667,10 @@
             if (Math.random() * 100 < d.chance) {
                 if (state.lv === 0) state.attr = config.attrs[Math.floor(Math.random() * config.attrs.length)];
                 state.lv++; 
-                showNoti('SUCCESS', '제련에 성공했습니다.', '#2d8a4e');
+                showNoti('SUCCESS', '제련에 성공했습니다 .', '#2d8a4e');
             } else {
                 state.lv = 0; state.spent = 0; state.attr = '일반';
-                showNoti('FAILED', '무기가 파괴되었습니다.', '#a33131');
+                showNoti('FAILED', '무기가 파괴되었습니다 .', '#a33131');
             }
             state.busy = false; 
             swordImg.style.transform = 'scale(1)'; 
@@ -687,7 +684,7 @@
         if (window.gameState.lv === 0) return;
         const v = calculateSellValue();
         window.gameState.money += v; 
-        showNoti('SOLD', `${v.toLocaleString()} KRW 획득.`, '#2d8a4e');
+        showNoti('SOLD', `${v.toLocaleString()} KRW 획득 .`, '#2d8a4e');
         reset();
     }
 
@@ -696,7 +693,7 @@
         const key = `${state.attr}_${state.lv}`;
         if (state.collection.includes(key)) return;
         state.collection.push(key);
-        showNoti('COLLECTED', '도감에 수집되었습니다.', '#2d8a4e');
+        showNoti('COLLECTED', '도감에 수집되었습니다 .', '#2d8a4e');
         reset();
     }
 
@@ -727,7 +724,6 @@
             const has = state.collection.includes('일반_0'); 
             if(has) cCount++;
             grid.appendChild(createSlot('기본검', 0, '일반', !has));
-            
             for(let i=0; i<8; i++) {
                 const empty = document.createElement('div');
                 empty.className = 'slot border-dashed border-zinc-900 opacity-10';
@@ -741,10 +737,9 @@
             }
         }
         
+        const rate = Math.floor((cCount / tCount) * 100);
         const rateText = document.getElementById('rate-text');
         const progFill = document.getElementById('col-prog-fill');
-        
-        const rate = Math.floor((cCount / tCount) * 100);
         if (rateText) rateText.textContent = rate + '%';
         if (progFill) progFill.style.width = rate + '%';
     }
